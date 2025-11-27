@@ -239,6 +239,42 @@ export class ApiSessionClient extends EventEmitter {
         });
     }
 
+    sendGeminiMessage(body: any) {
+        let content = {
+            role: 'agent',
+            content: {
+                type: 'gemini',
+                data: body  // This wraps the entire Gemini message
+            },
+            meta: {
+                sentFrom: 'cli'
+            }
+        };
+        const encrypted = encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, content));
+        this.socket.emit('message', {
+            sid: this.sessionId,
+            message: encrypted
+        });
+    }
+
+    sendCursorMessage(body: any) {
+        let content = {
+            role: 'agent',
+            content: {
+                type: 'cursor',
+                data: body  // This wraps the entire Cursor message
+            },
+            meta: {
+                sentFrom: 'cli'
+            }
+        };
+        const encrypted = encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, content));
+        this.socket.emit('message', {
+            sid: this.sessionId,
+            message: encrypted
+        });
+    }
+
     sendSessionEvent(event: {
         type: 'switch', mode: 'local' | 'remote'
     } | {

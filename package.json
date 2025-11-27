@@ -1,16 +1,16 @@
 {
-  "name": "happy-coder",
+  "name": "vibe-cli",
   "version": "0.11.2",
-  "description": "Mobile and Web client for Claude Code and Codex",
+  "description": "Vibe-on-the-Go CLI - Mobile and Web client for Claude Code and Codex",
   "author": "Kirill Dubovitskiy",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://github.com/slopus/happy-cli",
-  "bugs": "https://github.com/slopus/happy-cli/issues",
-  "repository": "slopus/happy-cli",
+  "homepage": "https://github.com/your-username/vibe-on-the-go",
+  "bugs": "https://github.com/your-username/vibe-on-the-go/issues",
+  "repository": "your-username/vibe-on-the-go",
   "bin": {
-    "happy": "./bin/happy.mjs",
-    "happy-mcp": "./bin/happy-mcp.mjs"
+    "vibe": "./bin/vibe.mjs",
+    "vibe-mcp": "./bin/vibe-mcp.mjs"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -36,14 +36,14 @@
         "default": "./dist/lib.mjs"
       }
     },
-    "./codex/happyMcpStdioBridge": {
+    "./codex/vibeMcpStdioBridge": {
       "require": {
-        "types": "./dist/codex/happyMcpStdioBridge.d.cts",
-        "default": "./dist/codex/happyMcpStdioBridge.cjs"
+        "types": "./dist/codex/vibeMcpStdioBridge.d.cts",
+        "default": "./dist/codex/vibeMcpStdioBridge.cjs"
       },
       "import": {
-        "types": "./dist/codex/happyMcpStdioBridge.d.mts",
-        "default": "./dist/codex/happyMcpStdioBridge.mjs"
+        "types": "./dist/codex/vibeMcpStdioBridge.d.mts",
+        "default": "./dist/codex/vibeMcpStdioBridge.mjs"
       }
     }
   },
@@ -55,11 +55,11 @@
     "package.json"
   ],
   "scripts": {
-    "why do we need to build before running tests / dev?": "We need the binary to be built so we run daemon commands which directly run the binary - we don't want them to go out of sync or have custom spawn logic depending how we started happy",
+    "why do we need to build before running tests / dev?": "We need the binary to be built so we run daemon commands which directly run the binary - we don't want them to go out of sync or have custom spawn logic depending how we started vibe",
     "typecheck": "tsc --noEmit",
     "build": "shx rm -rf dist && npx tsc --noEmit && pkgroll",
     "test": "yarn build && tsx --env-file .env.integration-test node_modules/.bin/vitest run",
-    "start": "yarn build && ./bin/happy.mjs",
+    "start": "yarn build && ./bin/vibe.mjs",
     "dev": "tsx src/index.ts",
     "dev:local-server": "yarn build && tsx --env-file .env.dev-local-server src/index.ts",
     "dev:integration-test-env": "yarn build && tsx --env-file .env.integration-test src/index.ts",

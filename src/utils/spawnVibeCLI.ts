@@ -1,5 +1,5 @@
 /**
- * Cross-platform Happy CLI spawning utility
+ * Cross-platform Vibe CLI spawning utility
  * 
  * ## Background
  * 
@@ -8,13 +8,13 @@
  * noise from end users by passing specific flags: `--no-warnings --no-deprecation`.
  * 
  * Users don't care about these technical details - they just want a clean experience
- * with no warning output when using Happy.
+ * with no warning output when using Vibe.
  * 
  * ## The Wrapper Strategy
  * 
- * We created a wrapper script `bin/happy.mjs` with a shebang `#!/usr/bin/env node`.
+ * We created a wrapper script `bin/vibe.mjs` with a shebang `#!/usr/bin/env node`.
  * This allows direct execution on Unix systems and NPM automatically generates 
- * Windows-specific wrapper scripts (`happy.cmd` and `happy.ps1`) when it sees 
+ * Windows-specific wrapper scripts (`vibe.cmd` and `vibe.ps1`) when it sees 
  * the `bin` field in package.json pointing to a JavaScript file with a shebang.
  * 
  * The wrapper script either directly execs `dist/index.mjs` with the flags we want,
@@ -23,19 +23,19 @@
  * ## Execution Chains
  * 
  * **Unix/Linux/macOS:**
- * 1. User runs `happy` command
- * 2. Shell directly executes `bin/happy.mjs` (shebang: `#!/usr/bin/env node`)
- * 3. `bin/happy.mjs` either execs `node --no-warnings --no-deprecation dist/index.mjs` or imports `dist/index.mjs` directly
+ * 1. User runs `vibe` command
+ * 2. Shell directly executes `bin/vibe.mjs` (shebang: `#!/usr/bin/env node`)
+ * 3. `bin/vibe.mjs` either execs `node --no-warnings --no-deprecation dist/index.mjs` or imports `dist/index.mjs` directly
  * 
  * **Windows:**
- * 1. User runs `happy` command  
- * 2. NPM wrapper (`happy.cmd`) calls `node bin/happy.mjs`
- * 3. `bin/happy.mjs` either execs `node --no-warnings --no-deprecation dist/index.mjs` or imports `dist/index.mjs` directly
+ * 1. User runs `vibe` command  
+ * 2. NPM wrapper (`vibe.cmd`) calls `node bin/vibe.mjs`
+ * 3. `bin/vibe.mjs` either execs `node --no-warnings --no-deprecation dist/index.mjs` or imports `dist/index.mjs` directly
  * 
  * ## The Spawning Problem
  * 
- * When our code needs to spawn Happy cli as a subprocess (for daemon processes), 
- * we were trying to execute `bin/happy.mjs` directly. This fails on Windows 
+ * When our code needs to spawn Vibe cli as a subprocess (for daemon processes), 
+ * we were trying to execute `bin/vibe.mjs` directly. This fails on Windows 
  * because Windows doesn't understand shebangs - you get an `EFTYPE` error.
  * 
  * ## The Solution
@@ -56,17 +56,17 @@ import { logger } from '@/ui/logger';
 import { existsSync } from 'node:fs';
 
 /**
- * Spawn the Happy CLI with the given arguments in a cross-platform way.
+ * Spawn the Vibe CLI with the given arguments in a cross-platform way.
  * 
- * This function bypasses the wrapper script (bin/happy.mjs) and spawns the 
+ * This function bypasses the wrapper script (bin/vibe.mjs) and spawns the 
  * actual CLI entrypoint (dist/index.mjs) directly with Node.js, ensuring
  * compatibility across all platforms including Windows.
  * 
- * @param args - Arguments to pass to the Happy CLI
+ * @param args - Arguments to pass to the Vibe CLI
  * @param options - Spawn options (same as child_process.spawn)
  * @returns ChildProcess instance
  */
-export function spawnHappyCLI(args: string[], options: SpawnOptions = {}): ChildProcess {
+export function spawnVibeCLI(args: string[], options: SpawnOptions = {}): ChildProcess {
   const projectRoot = projectPath();
   const entrypoint = join(projectRoot, 'dist', 'index.mjs');
 
@@ -77,12 +77,12 @@ export function spawnHappyCLI(args: string[], options: SpawnOptions = {}): Child
     directory = process.cwd()
   }
   // Note: We're actually executing 'node' with the calculated entrypoint path below,
-  // bypassing the 'happy' wrapper that would normally be found in the shell's PATH.
-  // However, we log it as 'happy' here because other engineers are typically looking
-  // for when "happy" was started and don't care about the underlying node process
+  // bypassing the 'vibe' wrapper that would normally be found in the shell's PATH.
+  // However, we log it as 'vibe' here because other engineers are typically looking
+  // for when "vibe" was started and don't care about the underlying node process
   // details and flags we use to achieve the same result.
-  const fullCommand = `happy ${args.join(' ')}`;
-  logger.debug(`[SPAWN HAPPY CLI] Spawning: ${fullCommand} in ${directory}`);
+  const fullCommand = `vibe ${args.join(' ')}`;
+  logger.debug(`[SPAWN VIBE CLI] Spawning: ${fullCommand} in ${directory}`);
   
   // Use the same Node.js flags that the wrapper script uses
   const nodeArgs = [
@@ -95,7 +95,7 @@ export function spawnHappyCLI(args: string[], options: SpawnOptions = {}): Child
   // Sanity check of the entrypoint path exists
   if (!existsSync(entrypoint)) {
     const errorMessage = `Entrypoint ${entrypoint} does not exist`;
-    logger.debug(`[SPAWN HAPPY CLI] ${errorMessage}`);
+    logger.debug(`[SPAWN VIBE CLI] ${errorMessage}`);
     throw new Error(errorMessage);
   }
   

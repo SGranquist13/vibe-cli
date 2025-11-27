@@ -1,12 +1,12 @@
-# Happy CLI Codebase Overview
+# Vibe CLI Codebase Overview
 
 ## Project Overview
 
-Happy CLI (`handy-cli`) is a command-line tool that wraps Claude Code to enable remote control and session sharing. It's part of a three-component system:
+Vibe CLI (`vibe-cli`) is a command-line tool that wraps Claude Code to enable remote control and session sharing. It's part of a three-component system:
 
-1. **handy-cli** (this project) - CLI wrapper for Claude Code
-2. **handy** - React Native mobile client
-3. **handy-server** - Node.js server with Prisma (hosted at https://api.happy-servers.com/)
+1. **vibe-cli** (this project) - CLI wrapper for Claude Code
+2. **vibe-on-the-go** - React Native mobile client
+3. **vibe-server** - Node.js server with Prisma (self-hosted)
 
 ## Code Style Preferences
 
@@ -120,7 +120,7 @@ User interface components.
 
 ## Security Considerations
 
-- Private keys stored in `~/.handy/access.key` with restricted permissions
+- Private keys stored in `~/.vibe/access.key` with restricted permissions
 - All communications encrypted using TweetNaCl
 - Challenge-response authentication prevents replay attacks
 - Session isolation through unique session IDs
@@ -140,21 +140,21 @@ User interface components.
 
 ## Starting the Daemon
 ```bash
-# From the happy-cli directory:
-./bin/happy.mjs daemon start
+# From the vibe-cli directory:
+./bin/vibe.mjs daemon start
 
 # With custom server URL (for local development):
-HAPPY_SERVER_URL=http://localhost:3005 ./bin/happy.mjs daemon start
+VIBE_SERVER_URL=http://localhost:3005 ./bin/vibe.mjs daemon start
 
 # Stop the daemon:
-./bin/happy.mjs daemon stop
+./bin/vibe.mjs daemon stop
 
 # Check daemon status:
-./bin/happy.mjs daemon status
+./bin/vibe.mjs daemon status
 ```
 
 ## Daemon Logs
-- Daemon logs are stored in `~/.happy-dev/logs/` (or `$HAPPY_HOME_DIR/logs/`)
+- Daemon logs are stored in `~/.vibe/logs/` (or `$VIBE_HOME_DIR/logs/`)
 - Named with format: `YYYY-MM-DD-HH-MM-SS-daemon.log`
 
 # Session Forking `claude` and sdk behavior
@@ -219,7 +219,7 @@ Lines 7-8: New messages from current interaction
 {"parentUuid":"...","sessionId":"1433467f-ff14-4292-b5b2-2aac77a808f0","message":{"role":"user","content":"what file did we just see?"},...}
 ```
 
-## Implications for handy-cli
+## Implications for vibe-cli
 
 When using --resume:
 1. Must handle new session ID in responses

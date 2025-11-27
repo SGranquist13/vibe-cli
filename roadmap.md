@@ -5,7 +5,7 @@ API Error: 500 {"type":"error","error":{"type":"api_error","message":"Overloaded
 Not showng
 Session
 213d643d-fc52-4d43-83cd-d4d1e1b45fc6
-logs  /Users/kirilldubovitskiy/.happy/logs/2025-07-20-20-48-12.log
+logs  /Users/kirilldubovitskiy/.vibe/logs/2025-07-20-20-48-12.log
 
 
 
@@ -111,7 +111,7 @@ We want to
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "329df624-b37c-4849-ab83-65722d321c29",
       "version": "1.0.51",
       "uuid": "072e0a05-5480-4a83-9f63-802da615b66b",
@@ -142,7 +142,7 @@ We want to
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "329df624-b37c-4849-ab83-65722d321c29",
       "version": "1.0.51",
       "uuid": "8b1593e4-c56e-4785-9dd0-741587021c95",
@@ -279,7 +279,7 @@ Emitted 'error' event on ReadStream instance at:
 - For local mode, same approach will work
 
 - Distribution
-  - Website - happyinc.ai?
+  - Website - vibeinc.ai?
   - App Store
   - Google Play
 
@@ -330,7 +330,7 @@ Blocking
 ### Nice to have
 - UX final touches - onboarding make sure terminal, add session icons or something catchy
 - See if I can simplify / get rid of a likely race condition in pty related code
-- Pass --local-installation to setup .happy folder locally and avoid clashing with global installation
+- Pass --local-installation to setup .vibe folder locally and avoid clashing with global installation
 
 # Distribution
 
@@ -349,5 +349,5 @@ Blocking
     - We can parse the terminal output
 
 - e2e single tests
-  - Would be nice to be able to run the whole thing - including pty to emulate a simple scenario and make sure a single multi step happy path works fine
+  - Would be nice to be able to run the whole thing - including pty to emulate a simple scenario and make sure a single multi step vibe path works fine
 

@@ -1,7 +1,7 @@
 /**
- * Minimal persistence functions for happy CLI
+ * Minimal persistence functions for vibe CLI
  * 
- * Handles settings and private key storage in ~/.happy/ or local .happy/
+ * Handles settings and private key storage in ~/.vibe/ or local .vibe/
  */
 
 import { FileHandle } from 'node:fs/promises'
@@ -18,7 +18,7 @@ interface Settings {
   // All machine operations use this ID
   machineId?: string
   machineIdConfirmedByServer?: boolean
-  daemonAutoStartWhenRunningHappy?: boolean
+  daemonAutoStartWhenRunningVibe?: boolean
 }
 
 const defaultSettings: Settings = {
@@ -52,8 +52,8 @@ export async function readSettings(): Promise<Settings> {
 }
 
 export async function writeSettings(settings: Settings): Promise<void> {
-  if (!existsSync(configuration.happyHomeDir)) {
-    await mkdir(configuration.happyHomeDir, { recursive: true })
+  if (!existsSync(configuration.vibeHomeDir)) {
+    await mkdir(configuration.vibeHomeDir, { recursive: true })
   }
 
   await writeFile(configuration.settingsFile, JSON.stringify(settings, null, 2))
@@ -114,8 +114,8 @@ export async function updateSettings(
     const updated = await updater(current);
 
     // Ensure directory exists
-    if (!existsSync(configuration.happyHomeDir)) {
-      await mkdir(configuration.happyHomeDir, { recursive: true });
+    if (!existsSync(configuration.vibeHomeDir)) {
+      await mkdir(configuration.vibeHomeDir, { recursive: true });
     }
 
     // Write atomically using rename
@@ -184,8 +184,8 @@ export async function readCredentials(): Promise<Credentials | null> {
 }
 
 export async function writeCredentialsLegacy(credentials: { secret: Uint8Array, token: string }): Promise<void> {
-  if (!existsSync(configuration.happyHomeDir)) {
-    await mkdir(configuration.happyHomeDir, { recursive: true })
+  if (!existsSync(configuration.vibeHomeDir)) {
+    await mkdir(configuration.vibeHomeDir, { recursive: true })
   }
   await writeFile(configuration.privateKeyFile, JSON.stringify({
     secret: encodeBase64(credentials.secret),
@@ -194,8 +194,8 @@ export async function writeCredentialsLegacy(credentials: { secret: Uint8Array, 
 }
 
 export async function writeCredentialsDataKey(credentials: { publicKey: Uint8Array, machineKey: Uint8Array, token: string }): Promise<void> {
-  if (!existsSync(configuration.happyHomeDir)) {
-    await mkdir(configuration.happyHomeDir, { recursive: true })
+  if (!existsSync(configuration.vibeHomeDir)) {
+    await mkdir(configuration.vibeHomeDir, { recursive: true })
   }
   await writeFile(configuration.privateKeyFile, JSON.stringify({
     encryption: { publicKey: encodeBase64(credentials.publicKey), machineKey: encodeBase64(credentials.machineKey) },

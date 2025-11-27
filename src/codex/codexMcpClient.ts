@@ -54,7 +54,7 @@ export class CodexMcpClient {
 
     constructor() {
         this.client = new Client(
-            { name: 'happy-codex-client', version: '1.0.0' },
+            { name: 'vibe-codex-client', version: '1.0.0' },
             { capabilities: { tools: {}, elicitation: {} } }
         );
 

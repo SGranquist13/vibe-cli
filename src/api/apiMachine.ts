@@ -1,5 +1,5 @@
 /**
- * WebSocket client for machine/daemon communication with Happy server
+ * WebSocket client for machine/daemon communication with Vibe server
  * Similar to ApiSessionClient but for machine-scoped connections
  */
 
@@ -101,7 +101,7 @@ export class ApiMachineClient {
         requestShutdown
     }: MachineRpcHandlers) {
         // Register spawn session handler
-        this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {
+        this.rpcHandlerManager.registerHandler('spawn-vibe-session', async (params: any) => {
             const { directory, sessionId, machineId, approvedNewDirectoryCreation, agent, token } = params || {};
             logger.debug(`[API MACHINE] Spawning session with params: ${JSON.stringify(params)}`);
 

@@ -1,6 +1,6 @@
 /**
- * Happy MCP server
- * Provides Happy CLI specific tools including chat session title management
+ * Vibe MCP server
+ * Provides Vibe CLI specific tools including chat session title management
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -12,10 +12,10 @@ import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
 
-export async function startHappyServer(client: ApiSessionClient) {
+export async function startVibeServer(client: ApiSessionClient) {
     // Handler that sends title updates via the client
     const handler = async (title: string) => {
-        logger.debug('[happyMCP] Changing title to:', title);
+        logger.debug('[vibeMCP] Changing title to:', title);
         try {
             // Send title as a summary message, similar to title generator
             client.sendClaudeSessionMessage({
@@ -35,9 +35,9 @@ export async function startHappyServer(client: ApiSessionClient) {
     //
 
     const mcp = new McpServer({
-        name: "Happy MCP",
+        name: "Vibe MCP",
         version: "1.0.0",
-        description: "Happy CLI MCP server with chat session management tools",
+        description: "Vibe CLI MCP server with chat session management tools",
     });
 
     mcp.registerTool('change_title', {
@@ -48,7 +48,7 @@ export async function startHappyServer(client: ApiSessionClient) {
         },
     }, async (args) => {
         const response = await handler(args.title);
-        logger.debug('[happyMCP] Response:', response);
+        logger.debug('[vibeMCP] Response:', response);
         
         if (response.success) {
             return {
@@ -106,7 +106,7 @@ export async function startHappyServer(client: ApiSessionClient) {
         url: baseUrl.toString(),
         toolNames: ['change_title'],
         stop: () => {
-            logger.debug('[happyMCP] Stopping server');
+            logger.debug('[vibeMCP] Stopping server');
             mcp.close();
             server.close();
         }

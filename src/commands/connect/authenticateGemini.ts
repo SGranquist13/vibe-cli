@@ -14,8 +14,8 @@ import { GeminiAuthTokens, PKCECodes } from './types';
 const execAsync = promisify(exec);
 
 // Google OAuth Configuration for Gemini
-const CLIENT_ID = '681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com';
-const CLIENT_SECRET = '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';
+const CLIENT_ID = process.env.GEMINI_CLIENT_ID;
+const CLIENT_SECRET = process.env.GEMINI_CLIENT_SECRET;
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const DEFAULT_PORT = 54545;
@@ -96,8 +96,8 @@ async function exchangeCodeForTokens(
         },
         body: new URLSearchParams({
             grant_type: 'authorization_code',
-            client_id: CLIENT_ID,
-            client_secret: CLIENT_SECRET,
+            client_id: CLIENT_ID!,
+            client_secret: CLIENT_SECRET!,
             code: code,
             code_verifier: verifier,
             redirect_uri: `http://localhost:${port}/oauth2callback`,
@@ -204,6 +204,20 @@ async function startCallbackServer(
 export async function authenticateGemini(): Promise<GeminiAuthTokens> {
     console.log('🚀 Starting Google Gemini authentication...');
     
+    // Validate environment variables
+    if (!CLIENT_ID) {
+        throw new Error(
+            'GEMINI_CLIENT_ID environment variable is not set. ' +
+            'Please set it in your .env file or environment.'
+        );
+    }
+    if (!CLIENT_SECRET) {
+        throw new Error(
+            'GEMINI_CLIENT_SECRET environment variable is not set. ' +
+            'Please set it in your .env file or environment.'
+        );
+    }
+    
     // Generate PKCE codes and state
     const { verifier, challenge } = generatePKCE();
     const state = generateState();
@@ -229,7 +243,7 @@ export async function authenticateGemini(): Promise<GeminiAuthTokens> {
     const redirect_uri = `http://localhost:${port}/oauth2callback`;
     
     const params = new URLSearchParams({
-        client_id: CLIENT_ID,
+        client_id: CLIENT_ID!,
         response_type: 'code',
         redirect_uri: redirect_uri,
         scope: SCOPES,

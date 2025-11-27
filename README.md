@@ -1,60 +1,165 @@
-# Happy
+<div align="center">
+  <h1>Vibe CLI</h1>
+  
+  <p><strong>Command-line wrapper for AI coding agents</strong></p>
+  
+  <p>
+    Enables remote control of <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>Gemini CLI</strong>, and <strong>Cursor CLI</strong>
+  </p>
+</div>
 
-Code on the go controlling claude code from your mobile device.
+---
 
-Free. Open source. Code anywhere.
+## 🚀 Installation
 
-## Installation
+### From npm (Recommended)
 
 ```bash
-npm install -g happy-coder
+npm install -g vibe-cli
 ```
 
-## Usage
+### From Source
 
 ```bash
-happy
+cd cli
+yarn install
+yarn build
+npm link
 ```
 
-This will:
-1. Start a Claude Code session
-2. Display a QR code to connect from your mobile device
-3. Allow real-time session sharing between Claude Code and your mobile app
+---
 
-## Commands
+## ✨ Usage
 
-- `happy auth` – Manage authentication
-- `happy codex` – Start Codex mode
-- `happy connect` – Store AI vendor API keys in Happy cloud
-- `happy notify` – Send a push notification to your devices
-- `happy daemon` – Manage background service
-- `happy doctor` – System diagnostics & troubleshooting
+### Start a Session
 
-## Options
+```bash
+# Claude Code
+vibe claude
 
-- `-h, --help` - Show help
-- `-v, --version` - Show version
-- `-m, --model <model>` - Claude model to use (default: sonnet)
-- `-p, --permission-mode <mode>` - Permission mode: auto, default, or plan
-- `--claude-env KEY=VALUE` - Set environment variable for Claude Code
-- `--claude-arg ARG` - Pass additional argument to Claude CLI
+# Codex
+vibe codex
 
-## Environment Variables
+# Gemini CLI
+vibe gemini
 
-- `HAPPY_SERVER_URL` - Custom server URL (default: https://api.cluster-fluster.com)
-- `HAPPY_WEBAPP_URL` - Custom web app URL (default: https://app.happy.engineering)
-- `HAPPY_HOME_DIR` - Custom home directory for Happy data (default: ~/.happy)
-- `HAPPY_DISABLE_CAFFEINATE` - Disable macOS sleep prevention (set to `true`, `1`, or `yes`)
-- `HAPPY_EXPERIMENTAL` - Enable experimental features (set to `true`, `1`, or `yes`)
+# Cursor CLI
+vibe cursor
+```
 
-## Requirements
+### Session Options
 
-- Node.js >= 20.0.0
-  - Required by `eventsource-parser@3.0.5`, which is required by
-  `@modelcontextprotocol/sdk`, which we used to implement permission forwarding
-  to mobile app
-- Claude CLI installed & logged in (`claude` command available in PATH)
+```bash
+vibe claude --resume     # Resume previous session
+```
 
-## License
+### Authentication
 
-MIT
+```bash
+vibe auth login          # Link to mobile app (generates QR code)
+vibe auth logout         # Log out
+vibe auth status         # Check auth status
+```
+
+### Daemon Mode
+
+Start sessions remotely from the mobile app:
+
+```bash
+vibe daemon start        # Start background daemon
+vibe daemon stop         # Stop daemon
+vibe daemon status       # Check status
+vibe daemon list         # List active sessions
+```
+
+### Diagnostics
+
+```bash
+vibe doctor              # System health check
+vibe doctor clean        # Cleanup stale processes
+```
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VIBE_SERVER_URL` | `https://vibe.whisk.dev` | Server URL |
+| `VIBE_HOME_DIR` | `~/.vibe` | Config directory |
+| `VIBE_EXPERIMENTAL` | - | Enable experimental features |
+| `VIBE_DISABLE_CAFFEINATE` | - | Disable macOS caffeinate |
+| `GEMINI_CLIENT_ID` | - | Google OAuth client ID for Gemini authentication |
+| `GEMINI_CLIENT_SECRET` | - | Google OAuth client secret for Gemini authentication |
+
+### Local Development
+
+```bash
+# Use local server
+export VIBE_SERVER_URL=http://localhost:3005
+vibe claude
+```
+
+---
+
+## 🏗️ Architecture
+
+```
+vibe claude
+    │
+    ├── Creates encrypted session
+    ├── Connects to server via WebSocket
+    ├── Spawns Claude Code
+    │
+    └── Syncs messages to mobile app
+```
+
+**Supported Agents:**
+
+| Agent | Integration Method |
+|-------|-------------------|
+| Claude Code | Claude Code SDK + file watching |
+| Codex | MCP (Model Context Protocol) |
+| Gemini CLI | Process spawning |
+| Cursor CLI | Process spawning |
+
+---
+
+## 🛠️ Development
+
+```bash
+# Build
+yarn build
+
+# Development mode
+yarn dev
+
+# Run tests
+yarn test
+
+# Type check
+yarn typecheck
+```
+
+---
+
+## 📖 Documentation
+
+- [**Main README**](../README.md) — Full project overview
+- [**Quick Start**](../QUICK_START.md) — Complete setup guide
+- [**CLI Development Guide**](CLAUDE.md) — Detailed development docs
+
+### Agent Integration Docs
+
+- [Claude Code Integration](docs/CLAUDE_CODE_INTEGRATION.md)
+- [Codex Integration](docs/CODEX_INTEGRATION.md)
+- [Gemini Integration](docs/GEMINI_INTEGRATION.md)
+- [Cursor Integration](docs/CURSOR_INTEGRATION.md)
+
+---
+
+## 📄 License
+
+MIT License

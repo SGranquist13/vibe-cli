@@ -9,9 +9,9 @@ import { authenticateGemini } from './connect/authenticateGemini';
  * Handle connect subcommand
  * 
  * Implements connect subcommands for storing AI vendor API keys:
- * - connect codex: Store OpenAI API key in Happy cloud
- * - connect claude: Store Anthropic API key in Happy cloud
- * - connect gemini: Store Gemini API key in Happy cloud
+ * - connect codex: Store OpenAI API key in Vibe cloud
+ * - connect claude: Store Anthropic API key in Vibe cloud
+ * - connect gemini: Store Gemini API key in Vibe cloud
  * - connect help: Show help for connect command
  */
 export async function handleConnectCommand(args: string[]): Promise<void> {
@@ -41,39 +41,39 @@ export async function handleConnectCommand(args: string[]): Promise<void> {
 
 function showConnectHelp(): void {
     console.log(`
-${chalk.bold('happy connect')} - Connect AI vendor API keys to Happy cloud
+${chalk.bold('vibe connect')} - Connect AI vendor API keys to Vibe cloud
 
 ${chalk.bold('Usage:')}
-  happy connect codex        Store your Codex API key in Happy cloud
-  happy connect claude       Store your Anthropic API key in Happy cloud
-  happy connect gemini       Store your Gemini API key in Happy cloud
-  happy connect help         Show this help message
+  vibe connect codex        Store your Codex API key in Vibe cloud
+  vibe connect claude       Store your Anthropic API key in Vibe cloud
+  vibe connect gemini       Store your Gemini API key in Vibe cloud
+  vibe connect help          Show this help message
 
 ${chalk.bold('Description:')}
   The connect command allows you to securely store your AI vendor API keys
-  in Happy cloud. This enables you to use these services through Happy
+  in Vibe cloud. This enables you to use these services through Vibe
   without exposing your API keys locally.
 
 ${chalk.bold('Examples:')}
-  happy connect codex
-  happy connect claude
-  happy connect gemini
+  vibe connect codex
+  vibe connect claude
+  vibe connect gemini
 
 ${chalk.bold('Notes:')} 
-  • You must be authenticated with Happy first (run 'happy auth login')
-  • API keys are encrypted and stored securely in Happy cloud
-  • You can manage your stored keys at app.happy.engineering
+  • You must be authenticated with Vibe first (run 'vibe auth login')
+  • API keys are encrypted and stored securely in Vibe cloud
+  • You can manage your stored keys through the vibe mobile app
 `);
 }
 
 async function handleConnectVendor(vendor: 'codex' | 'claude' | 'gemini', displayName: string): Promise<void> {
-    console.log(chalk.bold(`\n🔌 Connecting ${displayName} to Happy cloud\n`));
+    console.log(chalk.bold(`\n🔌 Connecting ${displayName} to Vibe cloud\n`));
 
     // Check if authenticated
     const credentials = await readCredentials();
     if (!credentials) {
-        console.log(chalk.yellow('⚠️  Not authenticated with Happy'));
-        console.log(chalk.gray('  Please run "happy auth login" first'));
+        console.log(chalk.yellow('⚠️  Not authenticated with Vibe'));
+        console.log(chalk.gray('  Please run "vibe auth login" first'));
         process.exit(1);
     }
 

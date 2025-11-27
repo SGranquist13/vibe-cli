@@ -43,7 +43,7 @@ export class ApiClient {
       encryptionVariant = 'dataKey';
 
       // Derive and encrypt data encryption key
-      // const contentDataKey = await deriveKey(this.secret, 'Happy EnCoder', ['content']);
+      // const contentDataKey = await deriveKey(this.secret, 'Vibe EnCoder', ['content']);
       // const publicKey = libsodiumPublicKeyFromSecretKey(contentDataKey);
       let encryptedDataKey = libsodiumEncryptForPublicKey(encryptionKey, this.credential.encryption.publicKey);
       dataEncryptionKey = new Uint8Array(encryptedDataKey.length + 1);
@@ -140,7 +140,7 @@ export class ApiClient {
 
     if (response.status !== 200) {
       console.error(chalk.red(`[API] Failed to create machine: ${response.statusText}`));
-      console.log(chalk.yellow(`[API] Failed to create machine: ${response.statusText}, most likely you have re-authenticated, but you still have a machine associated with the old account. Now we are trying to re-associate the machine with the new account. That is not allowed. Please run 'happy doctor clean' to clean up your happy state, and try your original command again. Please create an issue on github if this is causing you problems. We apologize for the inconvenience.`));
+      console.log(chalk.yellow(`[API] Failed to create machine: ${response.statusText}, most likely you have re-authenticated, but you still have a machine associated with the old account. Now we are trying to re-associate the machine with the new account. That is not allowed. Please run 'vibe doctor clean' to clean up your vibe state, and try your original command again. Please create an issue on github if this is causing you problems. We apologize for the inconvenience.`));
       process.exit(1);
     }
 

@@ -4,14 +4,16 @@ import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 
-// Ensure Node flags to reduce noisy warnings on stdout (which could interfere with MCP)
+// Check if we're already running with the flags
 const hasNoWarnings = process.execArgv.includes('--no-warnings');
 const hasNoDeprecation = process.execArgv.includes('--no-deprecation');
 
 if (!hasNoWarnings || !hasNoDeprecation) {
+  // Get path to the actual CLI entrypoint
   const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-  const entrypoint = join(projectRoot, 'dist', 'codex', 'vibeMcpStdioBridge.mjs');
-
+  const entrypoint = join(projectRoot, 'dist', 'index.mjs');
+  
+  // Execute the actual CLI directly with the correct flags
   try {
     execFileSync(process.execPath, [
       '--no-warnings',
@@ -23,10 +25,11 @@ if (!hasNoWarnings || !hasNoDeprecation) {
       env: process.env
     });
   } catch (error) {
+    // execFileSync throws if the process exits with non-zero
     process.exit(error.status || 1);
   }
 } else {
-  // Already have desired flags; import module directly
-  import('../dist/codex/vibeMcpStdioBridge.mjs');
+  // We're running Node with the flags we wanted, import the CLI entrypoint
+  // module to avoid creating a new process.
+  import("../dist/index.mjs");
 }
-

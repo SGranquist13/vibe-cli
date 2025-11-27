@@ -13,6 +13,7 @@ import { render } from 'ink';
 import React from 'react';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger';
+import { copyToClipboard } from "@/utils/clipboard";
 
 export async function doAuth(): Promise<Credentials | null> {
     console.clear();
@@ -87,13 +88,25 @@ function selectAuthenticationMethod(): Promise<AuthMethod | null> {
 async function doMobileAuth(keypair: tweetnacl.BoxKeyPair): Promise<Credentials | null> {
     console.clear();
     console.log('\nMobile Authentication\n');
-    console.log('Scan this QR code with your Happy mobile app:\n');
+    console.log('Scan this QR code with your vibe mobile app:\n');
 
-    const authUrl = 'happy://terminal?' + encodeBase64Url(keypair.publicKey);
+    const authUrl = 'vibe://terminal?' + encodeBase64Url(keypair.publicKey);
     displayQRCode(authUrl);
 
     console.log('\nOr manually enter this URL:');
     console.log(authUrl);
+    
+    // For web browser users, show the full web URL
+    const webUrl = `http://localhost:8081/terminal/connect#key=${encodeBase64Url(keypair.publicKey)}`;
+    console.log('\n📱 For web browser users:');
+    console.log('Open this URL in your browser where the mobile app is running:');
+    console.log(webUrl);
+    
+    // Try to copy to clipboard (silently fail if it doesn't work)
+    const copied = await copyToClipboard(webUrl);
+    if (copied) {
+        console.log('✓ URL copied to clipboard');
+    }
     console.log('');
 
     return await waitForAuthentication(keypair);
@@ -119,9 +132,9 @@ async function doWebAuth(keypair: tweetnacl.BoxKeyPair): Promise<Credentials | n
     }
 
     // I changed this to always show the URL because we got a report from
-    // someone running happy inside a devcontainer that they saw the
+    // someone running vibe inside a devcontainer that they saw the
     // "Complete authentication in your browser window." but nothing opened.
-    // https://github.com/slopus/happy/issues/19
+    // https://github.com/your-username/vibe-on-the-go/issues/19
     console.log('\nIf the browser did not open, please copy and paste this URL:');
     console.log(webUrl);
     console.log('');

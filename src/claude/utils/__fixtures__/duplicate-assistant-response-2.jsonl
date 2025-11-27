@@ -1,4 +1,4 @@
-[16:29:14.606] Starting happy CLI with args:  ["/opt/homebrew/Cellar/node@22/22.17.0/bin/node","/Users/kirilldubovitskiy/projects/happy/handy-cli/src/index.ts"]
+[16:29:14.606] Starting vibe CLI with args:  ["/opt/homebrew/Cellar/node@22/22.17.0/bin/node","/Users/kirilldubovitskiy/projects/vibe/handy-cli/src/index.ts"]
 [16:29:14.717] Session created/loaded: cmdcb6iu700i8y61467myavcp (tag: 82f41d73-9bcf-45d9-8f75-d924529c8180) 
 [16:29:14.718] Session created: cmdcb6iu700i8y61467myavcp 
 [16:29:14.723] Registered RPC handler {"method":"permission","prefixedMethod":"cmdcb6iu700i8y61467myavcp:permission"}
@@ -60,7 +60,7 @@
  {
   "type": "system",
   "subtype": "init",
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "session_id": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "tools": [
     "Task",
@@ -108,7 +108,7 @@
 }
 [16:31:18.207] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "353d9b60-d9a7-4222-afab-4cd763e253ed",
@@ -122,7 +122,7 @@
 [16:31:18.207] [SESSION_SCANNER] Message key (new): user:353d9b60-d9a7-4222-afab-4cd763e253ed 
 [16:31:18.208] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "b619d804-a98c-4ebb-be3c-468f6a4ab3fd",
@@ -171,7 +171,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "b619d804-a98c-4ebb-be3c-468f6a4ab3fd",
@@ -239,7 +239,7 @@
  {
   "type": "system",
   "subtype": "init",
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "session_id": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "tools": [
     "Task",
@@ -287,7 +287,7 @@
 }
 [16:32:38.672] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "d3e28aa6-2c62-4905-8ba8-88cff6c1a6f7",
@@ -301,7 +301,7 @@
 [16:32:38.672] [SESSION_SCANNER] Message key (new): user:d3e28aa6-2c62-4905-8ba8-88cff6c1a6f7 
 [16:32:38.672] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "a604a34a-0010-4186-8973-9e182a71f8ce",
@@ -350,7 +350,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "a604a34a-0010-4186-8973-9e182a71f8ce",
@@ -389,7 +389,7 @@
         "id": "toolu_01EoE9NhZ4wde7p1T356JV9c",
         "name": "Write",
         "input": {
-          "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt",
+          "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt",
           "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content."
         }
       }
@@ -402,7 +402,7 @@
 }
 [16:32:40.383] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "179c24ec-902a-48df-9d11-2f5d5c5d9a5a",
@@ -419,7 +419,7 @@
         "id": "toolu_01EoE9NhZ4wde7p1T356JV9c",
         "name": "Write",
         "input": {
-          "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt",
+          "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt",
           "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content."
         }
       }
@@ -435,7 +435,7 @@
       "id": "toolu_01EoE9NhZ4wde7p1T356JV9c",
       "input": {
         "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content.",
-        "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt"
+        "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt"
       },
       "name": "Write",
       "type": "tool_use"
@@ -461,7 +461,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "179c24ec-902a-48df-9d11-2f5d5c5d9a5a",
@@ -478,7 +478,7 @@
             "id": "toolu_01EoE9NhZ4wde7p1T356JV9c",
             "name": "Write",
             "input": {
-              "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt",
+              "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt",
               "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content."
             }
           }
@@ -490,7 +490,7 @@
     }
   }
 }
-[16:32:40.451] Permission request3e043810-c9de-4c51-b8c3-f4e3ce323118 {"name":"Write","arguments":{"file_path":"/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt","content":"This is a sample file.\nIt contains some example text.\nHere's a third line of content."}} []
+[16:32:40.451] Permission request3e043810-c9de-4c51-b8c3-f4e3ce323118 {"name":"Write","arguments":{"file_path":"/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt","content":"This is a sample file.\nIt contains some example text.\nHere's a third line of content."}} []
 [16:32:40.531] Fetched 1 push tokens []
 [16:32:40.531] Sending 1 push notifications []
 [16:32:40.634] Push notifications sent successfully []
@@ -498,7 +498,7 @@
 [16:32:51.024] Permission response{"id":"3e043810-c9de-4c51-b8c3-f4e3ce323118","approved":false} []
 [16:32:51.029] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "d9c509c2-9678-44ad-82b8-2307c13d0963",
@@ -524,7 +524,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "d9c509c2-9678-44ad-82b8-2307c13d0963",
@@ -586,7 +586,7 @@
 }
 [16:32:54.141] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "9520f48e-7081-4213-82de-1192ebd5b438",
@@ -635,7 +635,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "9520f48e-7081-4213-82de-1192ebd5b438",
@@ -703,7 +703,7 @@
  {
   "type": "system",
   "subtype": "init",
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "session_id": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "tools": [
     "Task",
@@ -743,7 +743,7 @@
         "id": "toolu_01Ft13DVNM3F6LysCnDjApU2",
         "name": "Write",
         "input": {
-          "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt",
+          "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt",
           "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content."
         }
       }
@@ -756,7 +756,7 @@
 }
 [16:33:01.187] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "0c6f980f-20ce-42b7-b319-a19d41cd5f02",
@@ -804,7 +804,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "0c6f980f-20ce-42b7-b319-a19d41cd5f02",
@@ -829,7 +829,7 @@
 }
 [16:33:01.188] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "b853e391-f7b3-4ed1-a7f1-00fec151ec5f",
@@ -846,7 +846,7 @@
         "id": "toolu_01EoE9NhZ4wde7p1T356JV9c",
         "name": "Write",
         "input": {
-          "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt",
+          "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt",
           "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content."
         }
       }
@@ -861,7 +861,7 @@
       "id": "toolu_01EoE9NhZ4wde7p1T356JV9c",
       "input": {
         "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content.",
-        "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt"
+        "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt"
       },
       "name": "Write",
       "type": "tool_use"
@@ -887,7 +887,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "b853e391-f7b3-4ed1-a7f1-00fec151ec5f",
@@ -904,7 +904,7 @@
             "id": "toolu_01EoE9NhZ4wde7p1T356JV9c",
             "name": "Write",
             "input": {
-              "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt",
+              "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt",
               "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content."
             }
           }
@@ -917,7 +917,7 @@
 }
 [16:33:01.188] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "f7d0d388-ae13-4174-af2e-a347e934d036",
@@ -942,7 +942,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "f7d0d388-ae13-4174-af2e-a347e934d036",
@@ -964,7 +964,7 @@
 }
 [16:33:01.189] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "7696b55f-6063-4768-ad80-e139a83cd62c",
@@ -1012,7 +1012,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "7696b55f-6063-4768-ad80-e139a83cd62c",
@@ -1037,7 +1037,7 @@
 }
 [16:33:01.189] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "a96ace12-dad3-4cfd-96b5-44af2ca44c24",
@@ -1051,7 +1051,7 @@
 [16:33:01.189] [SESSION_SCANNER] Message key (new): user:a96ace12-dad3-4cfd-96b5-44af2ca44c24 
 [16:33:01.190] [SESSION_SCANNER] Processing message 
  {
-  "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+  "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
   "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
   "version": "1.0.51",
   "uuid": "60f48734-a40c-4d68-892b-cfc40fa4b662",
@@ -1068,7 +1068,7 @@
         "id": "toolu_01Ft13DVNM3F6LysCnDjApU2",
         "name": "Write",
         "input": {
-          "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt",
+          "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt",
           "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content."
         }
       }
@@ -1084,7 +1084,7 @@
       "id": "toolu_01Ft13DVNM3F6LysCnDjApU2",
       "input": {
         "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content.",
-        "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt"
+        "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt"
       },
       "name": "Write",
       "type": "tool_use"
@@ -1110,7 +1110,7 @@
   "content": {
     "type": "output",
     "data": {
-      "cwd": "/Users/kirilldubovitskiy/projects/happy/handy-cli",
+      "cwd": "/Users/kirilldubovitskiy/projects/vibe/handy-cli",
       "sessionId": "2e5eba41-3a26-47d6-ba0c-e05be99669f8",
       "version": "1.0.51",
       "uuid": "60f48734-a40c-4d68-892b-cfc40fa4b662",
@@ -1127,7 +1127,7 @@
             "id": "toolu_01Ft13DVNM3F6LysCnDjApU2",
             "name": "Write",
             "input": {
-              "file_path": "/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt",
+              "file_path": "/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt",
               "content": "This is a sample file.\nIt contains some example text.\nHere's a third line of content."
             }
           }
@@ -1139,7 +1139,7 @@
     }
   }
 }
-[16:33:01.233] Permission requestea3be291-2457-4dfc-bac5-d1618c409405 {"name":"Write","arguments":{"file_path":"/Users/kirilldubovitskiy/projects/happy/handy-cli/dumm.txt","content":"This is a sample file.\nIt contains some example text.\nHere's a third line of content."}} []
+[16:33:01.233] Permission requestea3be291-2457-4dfc-bac5-d1618c409405 {"name":"Write","arguments":{"file_path":"/Users/kirilldubovitskiy/projects/vibe/handy-cli/dumm.txt","content":"This is a sample file.\nIt contains some example text.\nHere's a third line of content."}} []
 [16:33:01.308] Fetched 1 push tokens []
 [16:33:01.308] Sending 1 push notifications []
 [16:33:01.413] Push notifications sent successfully []
