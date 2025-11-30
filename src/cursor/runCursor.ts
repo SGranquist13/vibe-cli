@@ -20,6 +20,7 @@ import { hashObject } from '@/utils/deterministicJson';
 import { projectPath } from '@/projectPath';
 import { CursorClient } from './cursorClient';
 import { CursorPermissionHandler } from './utils/permissionHandler';
+import { CursorToolPermissionController } from './utils/toolPermissionController';
 import { startVibeServer } from '@/claude/utils/startVibeServer';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
 import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler';
@@ -82,6 +83,8 @@ export async function runCursor(opts: {
     };
     const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
     const session = api.sessionSyncClient(response);
+    const permissionHandler = new CursorPermissionHandler(session);
+    let permissionController: CursorToolPermissionController | null = null;
 
     // Report to daemon if it exists
     try {
@@ -164,13 +167,13 @@ export async function runCursor(opts: {
     // Abort handling
     let abortController = new AbortController();
     let shouldExit = false;
-
     async function handleAbort() {
         logger.debug('[Cursor] Abort requested - stopping current task');
         try {
             abortController.abort();
             messageQueue.reset();
             permissionHandler.reset();
+            permissionController?.reset();
             logger.debug('[Cursor] Abort completed - session remains active');
         } catch (error) {
             logger.debug('[Cursor] Error during abort:', error);
@@ -225,7 +228,18 @@ export async function runCursor(opts: {
 
     // Initialize Cursor client
     const client = new CursorClient();
-    const permissionHandler = new CursorPermissionHandler(session);
+    permissionController = new CursorToolPermissionController({
+        permissionHandler,
+        session,
+        onPermissionDenied: async () => {
+            await handleAbort();
+            session.sendCursorMessage({
+                type: 'system',
+                message: 'Current Cursor command aborted due to denied permission',
+                id: randomUUID()
+            });
+        }
+    });
 
     // Setup event handler
     client.setHandler((msg) => {
@@ -252,16 +266,25 @@ export async function runCursor(opts: {
                 break;
 
             case 'tool_call':
-            case 'function_call':
+            case 'function_call': {
                 // Tool/function call
+                const callId = msg.call_id || msg.id || randomUUID();
+                const toolName = msg.name || msg.function_name || 'unknown';
+                const input = msg.input || msg.arguments || {};
                 session.sendCursorMessage({
                     type: 'tool-call',
-                    name: msg.name || msg.function_name || 'unknown',
-                    callId: msg.call_id || msg.id || randomUUID(),
-                    input: msg.input || msg.arguments || {},
+                    name: toolName,
+                    callId,
+                    input,
                     id: randomUUID()
                 });
+                permissionController?.handleToolCall({
+                    callId,
+                    toolName,
+                    input
+                });
                 break;
+            }
 
             case 'tool_result':
             case 'function_result':
@@ -359,6 +382,7 @@ export async function runCursor(opts: {
                 wasCreated = false;
                 currentModeHash = null;
                 permissionHandler.reset();
+                permissionController?.reset();
                 thinking = false;
                 session.keepAlive(thinking, 'remote');
                 continue;
@@ -417,7 +441,6 @@ export async function runCursor(opts: {
                     session.sendSessionEvent({ type: 'message', message: 'Process exited unexpectedly' });
                 }
             } finally {
-                permissionHandler.reset();
                 thinking = false;
                 session.keepAlive(thinking, 'remote');
             }
@@ -434,6 +457,8 @@ export async function runCursor(opts: {
         }
 
         await client.disconnect();
+        permissionHandler.reset();
+        permissionController?.reset();
         vibeServer.stop();
         clearInterval(keepAliveInterval);
         stopCaffeinate();
