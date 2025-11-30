@@ -4,7 +4,7 @@
   <p><strong>Command-line wrapper for AI coding agents</strong></p>
   
   <p>
-    Enables remote control of <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>Gemini CLI</strong>, and <strong>Cursor CLI</strong>
+    Enables remote control of <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>Gemini CLI</strong> (in development), and <strong>Cursor CLI</strong> (in development)
   </p>
 </div>
 
@@ -44,10 +44,10 @@ vibe claude
 # Codex
 vibe codex
 
-# Gemini CLI
+# Gemini CLI (in development)
 vibe gemini
 
-# Cursor CLI
+# Cursor CLI (in development)
 vibe cursor
 ```
 
@@ -122,12 +122,12 @@ vibe claude
 
 **Supported Agents:**
 
-| Agent | Integration Method |
-|-------|-------------------|
-| Claude Code | Claude Code SDK + file watching |
-| Codex | MCP (Model Context Protocol) |
-| Gemini CLI | Process spawning |
-| Cursor CLI | Process spawning |
+| Agent | Integration Method | Status |
+|-------|-------------------|--------|
+| Claude Code | Claude Code SDK + file watching | ✅ Stable |
+| Codex | MCP (Model Context Protocol) | ✅ Stable |
+| Gemini CLI | Process spawning | 🚧 In Development |
+| Cursor CLI | Process spawning | 🚧 In Development |
 
 ---
 
