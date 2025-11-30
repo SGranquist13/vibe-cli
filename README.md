@@ -44,7 +44,7 @@ vibe claude
 # Codex
 vibe codex
 
-# Gemini CLI (in development)
+# Gemini CLI (experimental)
 vibe gemini
 
 # Cursor CLI (in development)
@@ -97,6 +97,7 @@ vibe doctor clean        # Cleanup stale processes
 | `VIBE_DISABLE_CAFFEINATE` | - | Disable macOS caffeinate |
 | `GEMINI_CLIENT_ID` | - | Google OAuth client ID for Gemini authentication |
 | `GEMINI_CLIENT_SECRET` | - | Google OAuth client secret for Gemini authentication |
+| `VIBE_GEMINI_BIN` | `gemini` | Override path to Gemini CLI binary (custom installs & tests) |
 
 ### Local Development
 
@@ -126,7 +127,7 @@ vibe claude
 |-------|-------------------|--------|
 | Claude Code | Claude Code SDK + file watching | ✅ Stable |
 | Codex | MCP (Model Context Protocol) | ✅ Stable |
-| Gemini CLI | Process spawning | 🚧 In Development |
+| Gemini CLI | Process spawning | ⚠️ Experimental |
 | Cursor CLI | Process spawning | 🚧 In Development |
 
 ---
@@ -177,6 +178,10 @@ yarn test
 # Type check
 yarn typecheck
 ```
+
+#### CLI smoke tests
+
+`yarn test` compiles the CLI and runs Vitest. The Gemini suite now spawns a stub binary through `VIBE_GEMINI_BIN`, which means you can validate the CLI wiring without installing the official Gemini executable. To point the smoke tests (or the real CLI) at a specific install, export `VIBE_GEMINI_BIN=/absolute/path/to/gemini`.
 
 ### Local Development Setup
 

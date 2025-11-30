@@ -2,13 +2,13 @@
 
 ## Introduction
 
-This document explains how Vibe-on-the-Go integrates with Gemini CLI, covering the architecture, message flow, integration method, and extensibility patterns. This serves as a reference for understanding the current implementation and for completing the integration.
+This document explains how Vibe-on-the-Go integrates with Gemini CLI, covering the architecture, message flow, integration method, and extensibility patterns. This serves as a reference for understanding the current implementation and for tracking the remaining gaps.
 
-**⚠️ Status: This integration is in progress and requires completion of the Gemini CLI client implementation.**
+**⚠️ Status: Experimental — the process-based client is wired end-to-end, but resume support and richer permission enforcement still need work.**
 
 ## Architecture Overview
 
-Vibe-on-the-Go integrates with Gemini CLI through a **process-based or MCP-based system** (to be determined based on Gemini CLI's interface).
+Vibe-on-the-Go integrates with Gemini CLI through a **process-based system today**, with MCP or HTTP transports kept in mind for future iterations.
 
 ### High-Level Architecture
 
@@ -56,25 +56,11 @@ Vibe-on-the-Go integrates with Gemini CLI through a **process-based or MCP-based
 
 ## Integration Method
 
-### To Be Determined
+### Current approach: process spawning
 
-The integration method depends on how Gemini CLI exposes its interface. Based on the [Gemini CLI documentation](https://github.com/google-gemini/gemini-cli), possible approaches:
+The Gemini integration currently spawns the official `gemini` CLI with `--output-format stream-json`, mirroring the Claude process bridge. `GeminiClient` owns the child process, parses JSON lines from stdout, and forwards structured events back to the session. You can override the executable path with `VIBE_GEMINI_BIN` to support custom installs or the automated smoke tests.
 
-1. **Process Spawning** (like Claude Code)
-   - Spawn `gemini` CLI process
-   - Use `--output-format stream-json` for structured output
-   - Parse stdout/stderr for messages
-
-2. **MCP Protocol** (like Codex)
-   - Connect via MCP stdio transport
-   - Use MCP events for messages
-   - Tool calls via MCP protocol
-
-3. **HTTP API** (if available)
-   - REST or WebSocket API
-   - Direct HTTP communication
-
-**Current Status**: The `GeminiClient` class is a skeleton that needs implementation based on the chosen method.
+Other transports (MCP/stdin or HTTP) are still possible future enhancements, but the process-based flow is the one that ships today.
 
 ## Key Components
 
@@ -106,19 +92,14 @@ The implementation follows the same pattern as `runCodex.ts` but maintains compl
 
 **Location**: [`cli/src/gemini/geminiClient.ts`](cli/src/gemini/geminiClient.ts)
 
-Wraps communication with Gemini CLI. Currently a skeleton that needs implementation.
+Wraps communication with the Gemini CLI process.
 
-**Key Methods:**
-- `connect()` - Connect to Gemini CLI
-- `startSession()` - Start a new session
-- `continueSession()` - Continue existing session
-- `disconnect()` - Cleanup connection
-
-**TODO**: Implement based on Gemini CLI's interface:
-- Determine if Gemini CLI uses process spawning, MCP, or HTTP
-- Implement message parsing
-- Handle session management
-- Process tool calls and responses
+**Key Behaviors:**
+- Resolves the CLI binary (including `VIBE_GEMINI_BIN` overrides) and spawns it via `cross-spawn`.
+- Forces `--output-format stream-json` in non-interactive mode so that mobile/daemon sessions stay in sync.
+- Streams stdout line-by-line, parses JSON payloads, and pushes them through the handler registered by `runGemini.ts`.
+- Caches the last session config (cwd/model) so `continueSession()` reuses the same environment when spawning follow-up prompts.
+- Provides a hook for future resume support (`storeSessionForResume`) and abort handling via the injected `AbortSignal`.
 
 #### Windows spawning & troubleshooting
 
@@ -230,15 +211,15 @@ User Input (Terminal/Mobile)
 
 ### Message Types
 
-Gemini integration will handle several message types (to be determined based on Gemini CLI's output):
+Gemini integration currently handles:
 
-1. **Messages**: Text messages from Gemini
-2. **Tool Calls**: Requests to execute tools
-3. **Tool Results**: Results from tool execution
-4. **Thinking**: Reasoning/thinking indicators
-5. **System**: System messages and errors
+1. **Messages**: Assistant responses (streaming deltas are accumulated before sending to mobile)
+2. **Tool Calls**: Emitted as `tool-call` events, preserving Gemini's `tool_use` metadata
+3. **Tool Results**: Returned as `tool-call-result` entries
+4. **Thinking**: Optional reasoning text mapped to the mobile “thinking” indicator
+5. **System/Error**: Filtered to suppress Gemini's verbose debug logs so mobile only sees actionable issues
 
-**Implementation**: The event handler in `runGemini.ts` needs to be completed to process Gemini-specific message types.
+The event handler in `runGemini.ts` normalizes these types before passing them to `session.sendGeminiMessage()`.
 
 ## Session Management
 
@@ -372,44 +353,27 @@ finally {
 - [x] Message queue setup
 - [x] Cleanup handlers
 
-### TODO 🔲
+### TODO / Status
 
-- [ ] **Determine Gemini CLI interface**: Process spawning, MCP, or HTTP?
-- [ ] **Implement `GeminiClient.connect()`**: Based on chosen interface
-- [ ] **Implement `GeminiClient.startSession()`**: Start Gemini CLI session
-- [ ] **Implement `GeminiClient.continueSession()`**: Continue existing session
-- [ ] **Implement message parsing**: Parse Gemini CLI output/events
-- [ ] **Implement event handler**: Process Gemini-specific message types
-- [ ] **Implement session ID extraction**: Extract from Gemini responses
-- [ ] **Implement session resume**: If Gemini CLI supports it
-- [ ] **Test integration**: End-to-end testing
-- [ ] **Update documentation**: Complete this document with actual implementation details
+- [x] **Determine Gemini CLI interface**: Process spawning with `--output-format stream-json`
+- [x] **Implement `GeminiClient.connect()` / `startSession()`**: Spawn CLI, parse stdout
+- [x] **Implement `GeminiClient.continueSession()`**: Reuse cwd/model for follow-up prompts
+- [x] **Implement message parsing and event handler**: Normalized in `runGemini.ts`
+- [x] **Implement session ID extraction**: Captures identifiers from CLI messages
+- [ ] **Implement session resume**: Blocked on upstream CLI support
+- [x] **Test integration**: Covered by `src/gemini/geminiClient.test.ts` smoke tests
+- [x] **Update documentation**: Reflect current behavior and config overrides
 
 ## Next Steps
 
-1. **Research Gemini CLI Interface**:
-   - Check if Gemini CLI supports MCP
-   - Check if it uses process spawning with structured output
-   - Check if it has an HTTP API
-   - Review Gemini CLI source code/documentation
+1. **Session resume + history**  
+   Track upstream Gemini CLI changes for a `--resume`/`--session` flag and persist the identifiers surfaced by `GeminiClient.storeSessionForResume()` so multi-turn context survives process restarts.
 
-2. **Implement GeminiClient**:
-   - Choose integration method
-   - Implement connection logic
-   - Implement session management
-   - Implement message parsing
+2. **Permission mode parity**  
+   Wire `GeminiPermissionHandler` into real tool execution once the CLI exposes hooks for approval workflows, and map Vibe's `read-only`, `safe-yolo`, and `yolo` modes accordingly.
 
-3. **Implement Message Processing**:
-   - Parse Gemini CLI output
-   - Convert to standard message format
-   - Handle tool calls and results
-   - Handle thinking/status messages
-
-4. **Testing**:
-   - Test session creation
-   - Test message flow
-   - Test permission handling
-   - Test cleanup
+3. **Full CLI validation**  
+   Extend the new Vitest smoke tests to optionally spawn the real Gemini binary (via `VIBE_GEMINI_BIN`) inside CI once stable credentials/fixtures are available, ensuring regressions are caught automatically.
 
 ## Code Examples
 

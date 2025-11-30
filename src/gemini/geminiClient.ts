@@ -125,6 +125,16 @@ function getGeminiCliPath(): string | null {
     return commandWorks() ? 'gemini' : null;
 }
 
+function resolveGeminiBinary(): string | null {
+    const override = process.env.VIBE_GEMINI_BIN;
+    if (override && override.trim().length > 0) {
+        const normalized = override.trim();
+        logger.debug(`[Gemini] Using VIBE_GEMINI_BIN override: ${normalized}`);
+        return normalized;
+    }
+    return getGeminiCliPath();
+}
+
 export class GeminiClient {
     private process: ChildProcess | null = null;
     private sessionId: string | null = null;
@@ -133,6 +143,7 @@ export class GeminiClient {
     private handler: ((event: any) => void) | null = null;
     private currentAbortSignal: AbortSignal | null = null;
     private stdoutReader: ReturnType<typeof createInterface> | null = null;
+    private lastSessionConfig: GeminiSessionConfig | null = null;
 
     constructor() {
         // Initialize Gemini client
@@ -168,10 +179,16 @@ export class GeminiClient {
 
         logger.debug('[Gemini] Starting session:', config);
 
-        const geminiPath = getGeminiCliPath();
+        const geminiPath = resolveGeminiBinary();
         if (!geminiPath) {
             throw new Error('Gemini CLI not found. Please install it: npm install -g @google/gemini-cli');
         }
+
+        // Cache config (without transient prompt) for future continuations
+        this.lastSessionConfig = {
+            ...config,
+            prompt: undefined
+        };
 
         // Build Gemini CLI arguments
         const args: string[] = [];
@@ -351,10 +368,13 @@ export class GeminiClient {
         logger.debug('[Gemini] Continuing session with prompt:', prompt);
         // Each continuation runs a fresh Gemini CLI invocation because the current CLI
         // lacks a clean API for streaming follow-up prompts non-interactively.
+        const baseConfig: GeminiSessionConfig = this.lastSessionConfig ?? {
+            cwd: process.cwd()
+        };
+
         return this.startSession({
+            ...baseConfig,
             prompt,
-            cwd: process.cwd(),
-            mcpServers: undefined // Preserve from previous session if needed
         }, options);
     }
 
@@ -446,6 +466,7 @@ export class GeminiClient {
         }
         this.sessionId = null;
         this.conversationId = null;
+        this.lastSessionConfig = null;
         logger.debug('[Gemini] Session cleared');
     }
 
