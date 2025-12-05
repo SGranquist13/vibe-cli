@@ -272,42 +272,83 @@ export class GeminiClient {
 
         // Handle stderr
         if (this.process.stderr) {
+            let stderrBuffer = '';
+            
             this.process.stderr.on('data', (data) => {
-                const text = data.toString().trim();
-                if (process.env.DEBUG) {
-                    logger.debug(`[Gemini] stderr: ${text}`);
-                }
-                // Only forward actual errors to handler, not debug/info output
-                // Debug output from Gemini CLI typically starts with [DEBUG], [INFO], etc.
-                const isDebugOutput = /^\[?(DEBUG|INFO|TRACE|WARN)\]?\s/i.test(text) ||
-                    text.includes('[MemoryDiscovery]') ||
-                    text.includes('[BfsFileSearch]') ||
-                    text.includes('[AgentRegistry]') ||
-                    text.includes('Scanning [') ||
-                    text.includes('batch of') ||
-                    text.includes('Experiments loaded') ||
-                    text.includes('experimentIds') ||
-                    text.includes('flagId') ||
-                    text.includes('Session ID:') ||
-                    text.includes('Flushing log events') ||
-                    text.includes('Clearcut') ||
-                    text.includes('cached credentials') ||
-                    text.startsWith('Loading') ||
-                    text.startsWith('Loaded') ||
-                    text.startsWith('Found readable') ||
-                    text.startsWith('Searching for') ||
-                    text.startsWith('Determined project') ||
-                    /^\s*[\[\{]/.test(text) || // Lines starting with [ or { (JSON fragments)
-                    /^\s*\d+,$/.test(text) ||  // Lines that are just numbers (array elements)
-                    /^\s*\]/.test(text);       // Lines that are just closing brackets
+                const chunk = data.toString();
+                stderrBuffer += chunk;
                 
-                if (!isDebugOutput && text.length > 0) {
-                    // Only forward if it looks like an actual error
-                    this.handler?.({
-                        type: 'error',
-                        message: text,
-                        timestamp: Date.now()
-                    });
+                // Process complete lines
+                const lines = stderrBuffer.split(/\r?\n/);
+                stderrBuffer = lines.pop() || ''; // Keep incomplete line in buffer
+                
+                for (const text of lines) {
+                    const trimmed = text.trim();
+                    if (!trimmed) continue;
+                    
+                    if (process.env.DEBUG) {
+                        logger.debug(`[Gemini] stderr: ${trimmed}`);
+                    }
+                    
+                    // Only forward actual errors to handler, not debug/info output
+                    // Debug output from Gemini CLI typically starts with [DEBUG], [INFO], etc.
+                    const isDebugOutput = /^\[?(DEBUG|INFO|TRACE|WARN)\]?\s/i.test(trimmed) ||
+                        trimmed.includes('[MemoryDiscovery]') ||
+                        trimmed.includes('[BfsFileSearch]') ||
+                        trimmed.includes('[AgentRegistry]') ||
+                        trimmed.includes('Scanning [') ||
+                        trimmed.includes('batch of') ||
+                        trimmed.includes('Experiments loaded') ||
+                        trimmed.includes('experimentIds') ||
+                        trimmed.includes('flagId') ||
+                        trimmed.includes('Session ID:') ||
+                        trimmed.includes('Flushing log events') ||
+                        trimmed.includes('Clearcut') ||
+                        trimmed.includes('cached credentials') ||
+                        trimmed.startsWith('Loading') ||
+                        trimmed.startsWith('Loaded') ||
+                        trimmed.startsWith('Found readable') ||
+                        trimmed.startsWith('Searching for') ||
+                        trimmed.startsWith('Determined project') ||
+                        /^\s*[\[\{]/.test(trimmed) || // Lines starting with [ or { (JSON fragments)
+                        /^\s*\d+,$/.test(trimmed) ||  // Lines that are just numbers (array elements)
+                        /^\s*\]/.test(trimmed);       // Lines that are just closing brackets
+                    
+                    if (!isDebugOutput && trimmed.length > 0) {
+                        // Check if this is a rate limit error
+                        const isRateLimit = trimmed.includes('429') || 
+                                           trimmed.includes('rateLimitExceeded') ||
+                                           trimmed.includes('RESOURCE_EXHAUSTED') ||
+                                           trimmed.includes('Resource exhausted') ||
+                                           trimmed.includes('GaxiosError');
+                        
+                        // Forward to handler
+                        this.handler?.({
+                            type: 'error',
+                            message: trimmed,
+                            isRateLimit,
+                            timestamp: Date.now()
+                        });
+                    }
+                }
+            });
+            
+            // Handle any remaining buffer on close
+            this.process.stderr.on('end', () => {
+                if (stderrBuffer.trim()) {
+                    const trimmed = stderrBuffer.trim();
+                    const isRateLimit = trimmed.includes('429') || 
+                                       trimmed.includes('rateLimitExceeded') ||
+                                       trimmed.includes('RESOURCE_EXHAUSTED');
+                    
+                    if (trimmed.length > 0) {
+                        this.handler?.({
+                            type: 'error',
+                            message: trimmed,
+                            isRateLimit,
+                            timestamp: Date.now()
+                        });
+                    }
                 }
             });
         }
