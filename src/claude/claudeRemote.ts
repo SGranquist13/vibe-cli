@@ -180,6 +180,10 @@ export async function claudeRemote(opts: {
                     logger.debug(`[claudeRemote] Session file found: ${systemInit.session_id} ${found}`);
                     opts.onSessionFound(systemInit.session_id);
                 }
+
+                // Send ready event right after SDK initializes, so mobile app knows session is ready
+                // This ensures the first message is processed correctly
+                opts.onReady();
             }
 
             // Handle result messages
@@ -196,7 +200,8 @@ export async function claudeRemote(opts: {
                     isCompactCommand = false;
                 }
 
-                // Send ready event
+                // Send ready event after message completes (for subsequent messages)
+                // Note: onReady() is also called after SDK init to handle the first message
                 opts.onReady();
 
                 // Push next message
