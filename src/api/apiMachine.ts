@@ -18,6 +18,7 @@ interface ServerToDaemonEvents {
     'rpc-registered': (data: { method: string }) => void;
     'rpc-unregistered': (data: { method: string }) => void;
     'rpc-error': (data: { type: string, error: string }) => void;
+    'improve-prompt-request': (data: { prompt: string; agentType: 'claude' | 'codex' | 'gemini' | 'cursor' }) => void;
     auth: (data: { success: boolean, user: string }) => void;
     error: (data: { message: string }) => void;
 }
@@ -67,18 +68,23 @@ interface DaemonToServerEvents {
         result?: any
         error?: string
     }) => void) => void;
+    
+    'improve-prompt-response': (data: { success: boolean; improvedPrompt?: string; error?: string }) => void;
+    'improve-prompt-error': (data: { message: string }) => void;
 }
 
 type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
+    improvePrompt?: (options: { prompt: string; agentType: 'claude' | 'codex' | 'gemini' | 'cursor' }) => Promise<{ success: boolean; improvedPrompt?: string; error?: string }>;
 }
 
 export class ApiMachineClient {
     private socket!: Socket<ServerToDaemonEvents, DaemonToServerEvents>;
     private keepAliveInterval: NodeJS.Timeout | null = null;
     private rpcHandlerManager: RpcHandlerManager;
+    private improvePromptHandler?: (options: { prompt: string; agentType: 'claude' | 'codex' | 'gemini' | 'cursor' }) => Promise<{ success: boolean; improvedPrompt?: string; error?: string }>;
 
     constructor(
         private token: string,
@@ -98,8 +104,13 @@ export class ApiMachineClient {
     setRPCHandlers({
         spawnSession,
         stopSession,
-        requestShutdown
+        requestShutdown,
+        improvePrompt
     }: MachineRpcHandlers) {
+        // Store improvePrompt handler for socket event
+        if (improvePrompt) {
+            this.improvePromptHandler = improvePrompt;
+        }
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-vibe-session', async (params: any) => {
             const { directory, sessionId, machineId, approvedNewDirectoryCreation, agent, token } = params || {};
@@ -154,6 +165,20 @@ export class ApiMachineClient {
 
             return { message: 'Daemon stop request acknowledged, starting shutdown sequence...' };
         });
+
+        // Register improve prompt handler (if provided)
+        if (improvePrompt) {
+            this.rpcHandlerManager.registerHandler('improve-prompt', async (params: any) => {
+                const { prompt, agentType } = params || {};
+                logger.debug(`[API MACHINE] Improving prompt with agent: ${agentType}`);
+
+                if (!prompt) {
+                    throw new Error('Prompt is required');
+                }
+
+                return await improvePrompt({ prompt, agentType });
+            });
+        }
     }
 
     /**
@@ -248,6 +273,9 @@ export class ApiMachineClient {
             // Register all handlers
             this.rpcHandlerManager.onSocketConnect(this.socket);
 
+            // Set up improve-prompt listener after connection
+            this.setupImprovePromptListener();
+
             // Start keep-alive
             this.startKeepAlive();
         });
@@ -256,6 +284,10 @@ export class ApiMachineClient {
             logger.debug('[API MACHINE] Disconnected from server');
             this.rpcHandlerManager.onSocketDisconnect();
             this.stopKeepAlive();
+            // Remove improve-prompt listener on disconnect
+            if (this.socket) {
+                this.socket.off('improve-prompt-request');
+            }
         });
 
         // Single consolidated RPC handler
@@ -293,6 +325,48 @@ export class ApiMachineClient {
 
         this.socket.io.on('error', (error: any) => {
             logger.debug('[API MACHINE] Socket error:', error);
+        });
+    }
+
+    private setupImprovePromptListener() {
+        if (!this.socket) {
+            logger.debug('[API MACHINE] Cannot setup improve-prompt listener: socket not available');
+            return;
+        }
+        
+        // Remove any existing listener first
+        this.socket.off('improve-prompt-request');
+        
+        logger.debug(`[API MACHINE] Setting up improve-prompt listener. Handler available: ${!!this.improvePromptHandler}`);
+        
+        // Listen for improve-prompt requests from server
+        this.socket.on('improve-prompt-request', async (data: { prompt: string; agentType: 'claude' | 'codex' | 'gemini' | 'cursor' }) => {
+            logger.debug(`[API MACHINE] Received improve-prompt request for agent: ${data.agentType}`);
+            
+            // Forward to the improvePrompt handler if available
+            if (this.improvePromptHandler) {
+                try {
+                    logger.debug(`[API MACHINE] Calling improvePrompt handler...`);
+                    const result = await this.improvePromptHandler({
+                        prompt: data.prompt,
+                        agentType: data.agentType
+                    });
+                    logger.debug(`[API MACHINE] Handler returned:`, { success: result.success, hasImprovedPrompt: !!result.improvedPrompt, error: result.error });
+                    this.socket.emit('improve-prompt-response', result);
+                } catch (error) {
+                    logger.debug(`[API MACHINE] Error in improve-prompt handler:`, error);
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    logger.debug(`[API MACHINE] Emitting improve-prompt-error:`, errorMessage);
+                    this.socket.emit('improve-prompt-error', {
+                        message: errorMessage
+                    });
+                }
+            } else {
+                logger.debug(`[API MACHINE] Improve prompt handler not available - emitting error`);
+                this.socket.emit('improve-prompt-error', {
+                    message: 'Improve prompt handler not available'
+                });
+            }
         });
     }
 
