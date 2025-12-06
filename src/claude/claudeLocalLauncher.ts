@@ -70,10 +70,8 @@ export async function claudeLocalLauncher(session: Session): Promise<'switch' | 
             doSwitch();
         }); // When any message is received, abort current process, clean queue and switch to remote mode
 
-        // Exit if there are messages in the queue
-        if (session.queue.size() > 0) {
-            return 'switch';
-        }
+        // Don't exit early if there are messages in the queue - let the session start first
+        // The first message should be processed once the session is ready, not cause an immediate switch
 
         // Handle session start
         const handleSessionStart = (sessionId: string) => {
