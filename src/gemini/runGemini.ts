@@ -26,50 +26,8 @@ import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler'
 import { stopCaffeinate } from '@/utils/caffeinate';
 import { trimIdent } from '@/utils/trimIdent';
 import type { GeminiSessionConfig } from './types';
-
-/**
- * Check if a string looks like Gemini CLI debug/info output that should be filtered
- */
-function isGeminiDebugOutput(text: string): boolean {
-    if (!text || text.length === 0) return true;
-    
-    return (
-        // Debug prefixes
-        /^\[?(DEBUG|INFO|TRACE|WARN)\]?\s/i.test(text) ||
-        // Internal component logs
-        text.includes('[MemoryDiscovery]') ||
-        text.includes('[BfsFileSearch]') ||
-        text.includes('[AgentRegistry]') ||
-        // Progress indicators
-        text.includes('Scanning [') ||
-        text.includes('batch of') ||
-        // Experiment/config loading
-        text.includes('Experiments loaded') ||
-        text.includes('experimentIds') ||
-        text.includes('flagId') ||
-        text.includes('floatValue') ||
-        text.includes('stringValue') ||
-        // Session info
-        text.includes('Session ID:') ||
-        // Log flushing
-        text.includes('Flushing log events') ||
-        text.includes('Clearcut') ||
-        // Credentials
-        text.includes('cached credentials') ||
-        text.includes('Loaded cached') ||
-        // Various startup messages
-        text.startsWith('Loading') ||
-        text.startsWith('Loaded') ||
-        text.startsWith('Found readable') ||
-        text.startsWith('Searching for') ||
-        text.startsWith('Determined project') ||
-        text.startsWith('Initialized with') ||
-        // JSON fragments (partial objects/arrays)
-        /^\s*[\[\{]/.test(text) ||  // Lines starting with [ or {
-        /^\s*\d+,?\s*$/.test(text) || // Lines that are just numbers
-        /^\s*[\]\}],?\s*$/.test(text) // Lines that are just closing brackets
-    );
-}
+import { handleGeminiMessage } from './utils/messageHandler';
+import { isEchoOfUserMessage } from './utils/echoDetector';
 
 /**
  * Main entry point for Gemini CLI sessions
@@ -152,6 +110,13 @@ export async function runGemini(opts: {
 
     // Handle user messages
     session.onUserMessage((message) => {
+        // Store the user's message early to help detect echoes
+        if (!initialUserMessage && message.content.text) {
+            initialUserMessage = message.content.text;
+            hasReceivedFirstRealResponse = false;
+            logger.debug(`[Gemini] Stored initial user message: "${initialUserMessage.substring(0, 50)}..."`);
+        }
+        
         // Resolve permission mode
         let messagePermissionMode = currentPermissionMode;
         if (message.meta?.permissionMode) {
@@ -271,220 +236,99 @@ export async function runGemini(opts: {
     const client = new GeminiClient();
     const permissionHandler = new GeminiPermissionHandler(session);
 
-    // Track streaming message content for accumulation
-    let currentMessageContent: string = '';
-    let isStreamingMessage: boolean = false;
+    // Track initial user message to filter out echo/duplicate first response
+    let initialUserMessage: string | null = null;
+    let hasReceivedFirstRealResponse: boolean = false;
 
-    // Helper function to flush accumulated message content
-    const flushAccumulatedMessage = () => {
-        if (isStreamingMessage && currentMessageContent.length > 0) {
-            session.sendGeminiMessage({
-                type: 'message',
-                message: currentMessageContent,
-                id: randomUUID()
-            });
-            currentMessageContent = '';
-            isStreamingMessage = false;
-        }
-    };
+    // Track pending rate limit errors that are being retried
+    type PendingRateLimitError = { message: string; timeout: NodeJS.Timeout };
+    let pendingRateLimitError: PendingRateLimitError | null = null;
 
     // Setup event handler
     client.setHandler((msg) => {
         logger.debug(`[Gemini] Message: ${JSON.stringify(msg)}`);
 
-        // Process Gemini CLI stream-json messages
-        // Gemini CLI outputs JSON lines with different message types
-        const msgType = msg.type || msg.event || 'unknown';
+        // If we get a successful message/response, clear any pending rate limit error
+        if (msg.type === 'message' || msg.type === 'assistant' || msg.type === 'assistant_message' || msg.type === 'result') {
+            if (pendingRateLimitError !== null) {
+                logger.debug('[Gemini] Successful response received, suppressing pending rate limit error');
+                clearTimeout(pendingRateLimitError.timeout);
+                pendingRateLimitError = null;
+            }
+        }
 
-        switch (msgType) {
-            case 'message':
-            case 'assistant':
-            case 'assistant_message':
-                // Assistant text message - handle streaming deltas
-                const messageText = msg.message || msg.text || msg.content || '';
-                const isDelta = msg.delta === true;
-                
-                if (isDelta) {
-                    // Accumulate streaming content
-                    isStreamingMessage = true;
-                    currentMessageContent += messageText;
-                    // Don't send yet, wait for complete message
-                } else {
-                    // Complete message - send accumulated or current content
-                    const finalContent = isStreamingMessage ? currentMessageContent + messageText : messageText;
-                    if (finalContent.length > 0) {
-                        session.sendGeminiMessage({
-                            type: 'message',
-                            message: finalContent,
-                            id: randomUUID()
-                        });
-                    }
-                    // Reset streaming state
-                    currentMessageContent = '';
-                    isStreamingMessage = false;
+        // Process message using handler
+        handleGeminiMessage(msg, session, {
+            onThinkingChange: (newThinking) => {
+                thinking = newThinking;
+                session.keepAlive(thinking, 'remote');
+            },
+            onComplete: () => {
+                hasReceivedFirstRealResponse = true;
+                // Clear pending rate limit error on completion
+                if (pendingRateLimitError !== null) {
+                    logger.debug('[Gemini] Request completed successfully, suppressing pending rate limit error');
+                    clearTimeout(pendingRateLimitError.timeout);
+                    pendingRateLimitError = null;
+                }
+                sendReady();
+            },
+            // Echo detection callback - check before sending message
+            shouldSkipMessage: (messageText: string) => {
+                if (!hasReceivedFirstRealResponse && initialUserMessage && isEchoOfUserMessage(messageText, initialUserMessage)) {
+                    logger.debug(`[Gemini] Skipping duplicate first response (echo of user message). User: "${initialUserMessage.substring(0, 50)}...", Echo: "${messageText.substring(0, 50)}..."`);
+                    hasReceivedFirstRealResponse = true;
                     thinking = false;
                     session.keepAlive(thinking, 'remote');
+                    return true;
                 }
-                break;
-
-            case 'tool_use':
-                // Flush any accumulated message content before tool call
-                flushAccumulatedMessage();
-                // Gemini CLI uses tool_use (not tool_call)
-                // Map fields: tool_name → name, tool_id → callId, parameters → input
-                session.sendGeminiMessage({
-                    type: 'tool-call',
-                    name: msg.tool_name || msg.name || 'unknown',
-                    callId: msg.tool_id || msg.toolId || msg.call_id || randomUUID(),
-                    input: msg.parameters || msg.input || {},
-                    id: randomUUID()
-                });
-                break;
-
-            case 'tool_call':
-            case 'function_call':
-                // Flush any accumulated message content before tool call
-                flushAccumulatedMessage();
-                // Fallback for other possible event types
-                session.sendGeminiMessage({
-                    type: 'tool-call',
-                    name: msg.name || msg.function_name || msg.tool_name || 'unknown',
-                    callId: msg.call_id || msg.tool_id || msg.toolId || msg.id || randomUUID(),
-                    input: msg.input || msg.arguments || msg.parameters || {},
-                    id: randomUUID()
-                });
-                break;
-
-            case 'tool_result':
-                // Tool result - map fields correctly
-                session.sendGeminiMessage({
-                    type: 'tool-call-result',
-                    callId: msg.tool_id || msg.toolId || msg.call_id || msg.id || randomUUID(),
-                    output: msg.output || msg.result || {},
-                    is_error: msg.status === 'error' || msg.status === 'failed' || false,
-                    id: randomUUID()
-                });
-                break;
-
-            case 'function_result':
-                // Fallback for function_result
-                session.sendGeminiMessage({
-                    type: 'tool-call-result',
-                    callId: msg.call_id || msg.tool_id || msg.toolId || msg.id || randomUUID(),
-                    output: msg.output || msg.result || {},
-                    is_error: msg.status === 'error' || msg.status === 'failed' || false,
-                    id: randomUUID()
-                });
-                break;
-
-            case 'thinking':
-            case 'reasoning':
-                // Thinking/reasoning indicator
-                if (!thinking) {
-                    thinking = true;
-                    session.keepAlive(thinking, 'remote');
-                }
-                // Optionally send thinking messages to mobile
-                if (msg.text || msg.content) {
-                    session.sendGeminiMessage({
-                        type: 'thinking',
-                        message: msg.text || msg.content || '',
-                        id: randomUUID()
-                    });
-                }
-                break;
-
-            case 'error':
-                // Error message - only send if it looks like a real error
-                const errorText = msg.message || msg.error || '';
-                // Filter out debug-like "errors" which are actually info/progress messages
-                const isDebugError = isGeminiDebugOutput(errorText);
-                
-                if (errorText.length > 0 && !isDebugError) {
-                    session.sendGeminiMessage({
-                        type: 'error',
-                        message: errorText,
-                        id: randomUUID()
-                    });
-                }
-                break;
-
-            case 'system':
-            case 'system_message':
-                // System message
-                session.sendGeminiMessage({
-                    type: 'system',
-                    message: msg.message || msg.text || '',
-                    id: randomUUID()
-                });
-                break;
-
-            case 'done':
-            case 'complete':
-            case 'finished':
-                // Flush any accumulated message content
-                flushAccumulatedMessage();
-                // Task completed
-                thinking = false;
-                session.keepAlive(thinking, 'remote');
-                sendReady();
-                break;
-
-            case 'result':
-                // Flush any accumulated message content before result
-                flushAccumulatedMessage();
-                // Result event contains stats/metadata
-                thinking = false;
-                session.keepAlive(thinking, 'remote');
-                
-                // Extract and send usage statistics if available
-                if (msg.stats) {
-                    const stats = msg.stats;
-                    try {
-                        // Transform Gemini stats to Claude-like usage format
-                        const usage = {
-                            input_tokens: stats.input_tokens || 0,
-                            output_tokens: stats.output_tokens || 0,
-                            cache_creation_input_tokens: 0,
-                            cache_read_input_tokens: 0
-                        };
-                        
-                        // Send usage data via session client
-                        session.sendUsageData(usage);
-                        logger.debug(`[Gemini] Sent usage stats: ${JSON.stringify(usage)}`);
-                    } catch (error) {
-                        logger.debug('[Gemini] Failed to send usage data:', error);
+                return false;
+            },
+            // Rate limit error handler - track pending errors
+            onRateLimitError: (errorMessage: string) => {
+                // Check if error mentions retrying
+                if (errorMessage.includes('Retrying with backoff') || errorMessage.includes('retrying')) {
+                    logger.debug('[Gemini] Rate limit error with retry detected, will suppress if retry succeeds');
+                    
+                    // Clear any existing pending error
+                    if (pendingRateLimitError !== null) {
+                        clearTimeout(pendingRateLimitError.timeout);
                     }
+                    
+                    // Store the error and set a timeout to show it if retry fails
+                    pendingRateLimitError = {
+                        message: errorMessage,
+                        timeout: setTimeout(() => {
+                            // Only show if still pending (retry didn't succeed)
+                            if (pendingRateLimitError !== null) {
+                                logger.debug('[Gemini] Rate limit retry timeout expired, showing error');
+                                handleGeminiMessage({
+                                    type: 'error',
+                                    message: errorMessage,
+                                    isRateLimit: true
+                                }, session, {
+                                    onThinkingChange: (newThinking) => {
+                                        thinking = newThinking;
+                                        session.keepAlive(thinking, 'remote');
+                                    }
+                                });
+                                pendingRateLimitError = null;
+                            }
+                        }, 60000) // 60 second timeout - if no success by then, show the error
+                    };
+                    
+                    // Don't show the error immediately
+                    return true; // Suppress the error
                 }
-                
-                // Send ready event after result
-                sendReady();
-                break;
-
-            case 'progress':
-            case 'status':
-            case 'log':
-            case 'debug':
-            case 'info':
-                // Progress/status updates - just log, don't send to mobile
-                logger.debug(`[Gemini] Progress: ${msg.message || msg.text || JSON.stringify(msg)}`);
-                break;
-
-            default:
-                // Unknown message type - only send if it has meaningful text content
-                logger.debug(`[Gemini] Unknown message type: ${msgType}`);
-                const unknownText = msg.message || msg.text || msg.content;
-                // Only send if there's actual text content and it's not debug output
-                if (typeof unknownText === 'string' && unknownText.length > 0) {
-                    if (!isGeminiDebugOutput(unknownText)) {
-                        session.sendGeminiMessage({
-                            type: 'message',
-                            message: unknownText,
-                            id: randomUUID()
-                        });
-                    }
-                }
-                // Don't send raw JSON objects as messages
+                return false; // Show the error normally
+            }
+        });
+        
+        // Mark as received if it's a complete message
+        if (msg.type === 'message' || msg.type === 'assistant' || msg.type === 'assistant_message') {
+            if (!msg.delta && (msg.message || msg.text || msg.content)) {
+                hasReceivedFirstRealResponse = true;
+            }
         }
     });
 
@@ -517,6 +361,9 @@ export async function runGemini(opts: {
                 permissionHandler.reset();
                 thinking = false;
                 session.keepAlive(thinking, 'remote');
+                // Reset first response tracking for new session
+                initialUserMessage = null;
+                hasReceivedFirstRealResponse = false;
                 continue;
             }
 
@@ -528,6 +375,12 @@ export async function runGemini(opts: {
                     const isInteractive = Boolean(process.stdin.isTTY && process.stdout.isTTY && (interactiveEnv === '1' || interactiveEnv === 'true' || interactiveEnv === 'yes'));
                     
                     const promptText = first ? message.message + '\n\n' + trimIdent(`Based on this message, call functions.vibe__change_title to change chat session title that would represent the current task. If chat idea would change dramatically - call this function again to update the title.`) : message.message;
+                    
+                    // Store initial user message to filter out echo/duplicate first response
+                    if (!isInteractive && message.message) {
+                        initialUserMessage = message.message;
+                        hasReceivedFirstRealResponse = false;
+                    }
                     
                     const startConfig: GeminiSessionConfig = {
                         prompt: isInteractive ? undefined : promptText,
@@ -584,6 +437,13 @@ export async function runGemini(opts: {
     } finally {
         // Cleanup
         logger.debug('[Gemini] Final cleanup start');
+        
+        // Clear any pending rate limit error timeout
+        if (pendingRateLimitError !== null) {
+            clearTimeout((pendingRateLimitError as PendingRateLimitError).timeout);
+            pendingRateLimitError = null;
+        }
+        
         try {
             session.sendSessionDeath();
             await session.flush();
