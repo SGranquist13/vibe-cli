@@ -447,11 +447,118 @@ export async function startDaemon(): Promise<void> {
     // Create realtime machine session
     const apiMachine = api.machineSyncClient(machine);
 
+    // Improve prompt handler - uses agent SDK to improve prompts
+    const improvePrompt = async (options: { prompt: string; agentType: 'claude' | 'codex' | 'gemini' | 'cursor' }): Promise<{ success: boolean; improvedPrompt?: string; error?: string }> => {
+      logger.debug(`[DAEMON RUN] Improving prompt with agent: ${options.agentType}`);
+      
+      try {
+        if (options.agentType === 'claude') {
+          const { query } = await import('@/claude/sdk/query');
+          const { PushableAsyncIterable } = await import('@/utils/PushableAsyncIterable');
+          
+          // Create a more direct improvement prompt
+          const improvementPrompt = `Improve this prompt to be clearer and more effective. Return ONLY the improved prompt text, no explanations:\n\n${options.prompt}`;
+          
+          // Create abort controller for timeout
+          const abortController = new AbortController();
+          const timeoutId = setTimeout(() => {
+            abortController.abort();
+          }, 30000); // 30 second timeout
+          
+          try {
+            // Create message stream
+            const messages = new PushableAsyncIterable<any>();
+            messages.push({
+              type: 'user',
+              message: {
+                role: 'user',
+                content: improvementPrompt,
+              },
+            });
+            
+            // Make query with timeout and limited turns
+            // Disable all tools to speed up the response (we only need text)
+            const response = query({
+              prompt: messages,
+              options: {
+                cwd: os.tmpdir(),
+                permissionMode: 'default',
+                maxTurns: 1, // Only one turn
+                abort: abortController.signal,
+                disallowedTools: ['*'], // Disable all tools for faster response
+              },
+            });
+            
+            // Wait for assistant response
+            let improvedPrompt: string | null = null;
+            for await (const message of response) {
+              if (message.type === 'assistant') {
+                const assistantMsg = message as any;
+                if (assistantMsg.message?.content) {
+                  if (typeof assistantMsg.message.content === 'string') {
+                    improvedPrompt = assistantMsg.message.content.trim();
+                  } else if (Array.isArray(assistantMsg.message.content)) {
+                    // Extract text from content array
+                    const textParts = assistantMsg.message.content
+                      .filter((part: any) => part.type === 'text' && part.text)
+                      .map((part: any) => part.text);
+                    if (textParts.length > 0) {
+                      improvedPrompt = textParts.join('\n').trim();
+                    }
+                  }
+                  if (improvedPrompt) {
+                    clearTimeout(timeoutId);
+                    break;
+                  }
+                }
+              } else if (message.type === 'result') {
+                // Query completed
+                clearTimeout(timeoutId);
+                break;
+              }
+            }
+            
+            messages.end();
+            clearTimeout(timeoutId);
+            
+            if (improvedPrompt) {
+              return { success: true, improvedPrompt };
+            } else {
+              return { success: false, error: 'No response received from agent' };
+            }
+          } catch (error) {
+            clearTimeout(timeoutId);
+            if (error instanceof Error && error.name === 'AbortError') {
+              return { success: false, error: 'Request timed out after 30 seconds' };
+            }
+            throw error;
+          }
+        } else if (options.agentType === 'codex') {
+          // Codex implementation - similar pattern
+          // For now, return error as codex might need different handling
+          return { success: false, error: 'Codex prompt improvement not yet implemented' };
+        } else if (options.agentType === 'gemini') {
+          // Gemini implementation
+          return { success: false, error: 'Gemini prompt improvement not yet implemented' };
+        } else {
+          // Cursor implementation
+          return { success: false, error: 'Cursor prompt improvement not yet implemented' };
+        }
+      } catch (error) {
+        logger.debug('[DAEMON RUN] Error improving prompt:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
+        };
+      }
+    };
+
     // Set RPC handlers
     apiMachine.setRPCHandlers({
       spawnSession,
       stopSession,
-      requestShutdown: () => requestShutdown('vibe-app')
+      requestShutdown: () => requestShutdown('vibe-app'),
+      improvePrompt
     });
 
     // Connect to server
