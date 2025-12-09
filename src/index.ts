@@ -25,6 +25,7 @@ import { runDoctorCommand } from './ui/doctor'
 import { listDaemonSessions, stopDaemonSession } from './daemon/controlClient'
 import { handleAuthCommand } from './commands/auth'
 import { handleConnectCommand } from './commands/connect'
+import { handleRouterCommand } from './commands/router'
 import { spawnVibeCLI } from './utils/spawnVibeCLI'
 import { claudeCliPath } from './claude/claudeLocal'
 import { execFileSync } from 'node:child_process'
@@ -69,6 +70,18 @@ import { execFileSync } from 'node:child_process'
     // Handle connect subcommands
     try {
       await handleConnectCommand(args.slice(1));
+    } catch (error) {
+      console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
+      if (process.env.DEBUG) {
+        console.error(error)
+      }
+      process.exit(1)
+    }
+    return;
+  } else if (subcommand === 'router') {
+    // Handle router subcommands
+    try {
+      await handleRouterCommand(args.slice(1));
     } catch (error) {
       console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
       if (process.env.DEBUG) {
@@ -350,6 +363,7 @@ ${chalk.bold('Usage:')}
   vibe gemini            Start Gemini CLI mode
   vibe cursor            Start Cursor CLI mode
   vibe connect           Connect AI vendor API keys
+  vibe router            Manage Claude Code Router (route to different models)
   vibe notify            Send push notification
   vibe daemon            Manage background service that allows
                             to spawn new sessions away from your computer

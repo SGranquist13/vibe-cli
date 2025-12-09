@@ -173,6 +173,12 @@ export interface QueryOptions {
     fallbackModel?: string
     strictMcpConfig?: boolean
     canCallTool?: CanCallToolCallback
+
+    /**
+     * Router options for Claude Code Router integration
+     */
+    useRouter?: boolean
+    routerConfigPath?: string
 }
 
 /**

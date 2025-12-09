@@ -19,10 +19,19 @@ interface Settings {
   machineId?: string
   machineIdConfirmedByServer?: boolean
   daemonAutoStartWhenRunningVibe?: boolean
+
+  // Claude Code Router settings
+  router?: {
+    enabled: boolean
+    configPath?: string
+  }
 }
 
 const defaultSettings: Settings = {
-  onboardingCompleted: false
+  onboardingCompleted: false,
+  router: {
+    enabled: false
+  }
 }
 
 /**

@@ -25,6 +25,7 @@ import {
 import { getDefaultClaudeCodePath, logDebug, streamToStdin } from './utils'
 import type { Writable } from 'node:stream'
 import { logger } from '@/ui/logger'
+import { detectRouter, getCcrSpawnConfig } from '@/claude/utils/routerDetection'
 
 /**
  * Query class manages Claude Code process interaction
@@ -273,7 +274,9 @@ export function query(config: {
             model,
             fallbackModel,
             strictMcpConfig,
-            canCallTool
+            canCallTool,
+            useRouter = false,
+            routerConfigPath
         } = {}
     } = config
 
@@ -319,15 +322,30 @@ export function query(config: {
         args.push('--input-format', 'stream-json')
     }
 
-    // Validate executable path
-    if (!existsSync(pathToClaudeCodeExecutable)) {
-        throw new ReferenceError(`Claude Code executable not found at ${pathToClaudeCodeExecutable}. Is options.pathToClaudeCodeExecutable set?`)
+    // Determine final executable and args based on router usage
+    let finalExecutable = executable
+    let finalArgs: string[] = []
+
+    if (useRouter) {
+        // Router mode: use detectRouter synchronously or expect caller to provide executable
+        // For now, we'll use a simple approach where if useRouter is true,
+        // we expect the caller to have set appropriate executable and executableArgs
+        logger.debug('[query] Using Claude Code Router mode')
+        finalExecutable = executable
+        finalArgs = [...executableArgs, ...args]
+    } else {
+        // Normal mode: validate executable path
+        if (!existsSync(pathToClaudeCodeExecutable)) {
+            throw new ReferenceError(`Claude Code executable not found at ${pathToClaudeCodeExecutable}. Is options.pathToClaudeCodeExecutable set?`)
+        }
+        finalExecutable = executable
+        finalArgs = [...executableArgs, pathToClaudeCodeExecutable, ...args]
     }
 
     // Spawn Claude Code process
-    logDebug(`Spawning Claude Code process: ${executable} ${[...executableArgs, pathToClaudeCodeExecutable, ...args].join(' ')}`)
+    logDebug(`Spawning Claude Code process: ${finalExecutable} ${finalArgs.join(' ')}`)
 
-    const child = spawn(executable, [...executableArgs, pathToClaudeCodeExecutable, ...args], {
+    const child = spawn(finalExecutable, finalArgs, {
         cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         signal: config.options?.abort,

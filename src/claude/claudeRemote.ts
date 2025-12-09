@@ -10,6 +10,8 @@ import { getProjectPath } from "./utils/path";
 import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
+import { detectRouter, getCcrSpawnConfig } from "./utils/routerDetection";
+import { readSettings } from "@/persistence";
 
 export async function claudeRemote(opts: {
 
@@ -75,6 +77,29 @@ export async function claudeRemote(opts: {
         });
     }
 
+    // Check if router is enabled in settings
+    const settings = await readSettings();
+    const routerEnabled = settings.router?.enabled ?? false;
+
+    // Detect and configure Claude Code Router if enabled
+    let routerDetection = null;
+    let useRouter = false;
+
+    if (routerEnabled) {
+        routerDetection = await detectRouter(settings.router?.configPath);
+        useRouter = routerDetection.isInstalled && !routerDetection.error;
+
+        if (useRouter) {
+            logger.debug('[claudeRemote] Claude Code Router enabled and will be used');
+            logger.debug(`[claudeRemote] Router config path: ${routerDetection.configPath}`);
+        } else if (routerDetection.error) {
+            logger.warn(`[claudeRemote] Router enabled but not available: ${routerDetection.error}`);
+            logger.warn('[claudeRemote] Falling back to default Claude Code');
+        }
+    } else {
+        logger.debug('[claudeRemote] Router disabled, using default Claude Code');
+    }
+
     // Get initial message
     const initial = await opts.nextMessage();
     if (!initial) { // No initial message - exit
@@ -107,6 +132,22 @@ export async function claudeRemote(opts: {
 
     // Prepare SDK options
     let mode = initial.mode;
+
+    // Configure executable based on router availability
+    let executable = 'node';
+    let executableArgs: string[] = [];
+    let pathToClaudeCodeExecutable: string | undefined = resolve(join(projectPath(), 'scripts', 'claude_remote_launcher.cjs'));
+    let routerConfigPath: string | undefined = undefined;
+
+    if (useRouter && routerDetection && routerDetection.executablePath) {
+        const spawnConfig = getCcrSpawnConfig(routerDetection.executablePath);
+        executable = spawnConfig.executable;
+        executableArgs = spawnConfig.args;
+        pathToClaudeCodeExecutable = undefined; // Router doesn't use pathToClaudeCodeExecutable
+        routerConfigPath = routerDetection.configPath ?? undefined;
+        logger.debug(`[claudeRemote] Using router executable: ${spawnConfig.executable} ${spawnConfig.args.join(' ')}`);
+    }
+
     const sdkOptions: Options = {
         cwd: opts.path,
         resume: startFrom ?? undefined,
@@ -119,11 +160,12 @@ export async function claudeRemote(opts: {
         allowedTools: initial.mode.allowedTools ? initial.mode.allowedTools.concat(opts.allowedTools) : opts.allowedTools,
         disallowedTools: initial.mode.disallowedTools,
         canCallTool: (toolName: string, input: unknown, options: { signal: AbortSignal }) => opts.canCallTool(toolName, input, mode, options),
-        executable: 'node',
-        abort: opts.signal,
-        pathToClaudeCodeExecutable: (() => {
-            return resolve(join(projectPath(), 'scripts', 'claude_remote_launcher.cjs'));
-        })(),
+        executable,
+        executableArgs,
+        pathToClaudeCodeExecutable,
+        useRouter,
+        routerConfigPath,
+        abort: opts.signal
     }
 
     // Track thinking state
