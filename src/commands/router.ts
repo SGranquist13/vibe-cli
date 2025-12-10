@@ -55,6 +55,11 @@ async function enableRouter(args: string[]): Promise<void> {
         process.exit(1);
     }
 
+    if (detection.warnings && detection.warnings.length > 0) {
+        console.log(chalk.yellow(`⚠️  Router configuration warnings:`));
+        detection.warnings.forEach((warning) => console.log(chalk.yellow(`  - ${warning}`)));
+    }
+
     // Enable router
     await updateSettings((settings) => ({
         ...settings,
@@ -104,6 +109,11 @@ async function showRouterStatus(): Promise<void> {
         if (detection.isInstalled) {
             console.log(chalk.gray(`  Executable: ${detection.executablePath}`));
             console.log(chalk.gray(`  Config: ${detection.configPath}`));
+
+            if (detection.warnings && detection.warnings.length > 0) {
+                console.log(chalk.yellow('\n  Warnings:'));
+                detection.warnings.forEach((warning) => console.log(chalk.yellow(`    - ${warning}`)));
+            }
 
             if (detection.config) {
                 const providers = detection.config.providers || [];

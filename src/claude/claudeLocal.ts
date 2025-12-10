@@ -8,6 +8,8 @@ import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { getProjectPath } from "./utils/path";
 import { projectPath } from "@/projectPath";
 import { systemPrompt } from "./utils/systemPrompt";
+import { readSettings } from "@/persistence";
+import { detectRouter, getCcrSpawnConfig } from "./utils/routerDetection";
 
 
 // Get Claude CLI path from project root
@@ -77,28 +79,59 @@ export async function claudeLocal(opts: {
     try {
         // Start the interactive process
         process.stdin.pause();
-        await new Promise<void>((r, reject) => {
-            const args: string[] = []
-            if (startFrom) {
-                args.push('--resume', startFrom)
-            }
-            args.push('--append-system-prompt', systemPrompt);
+        await new Promise<void>(async (r, reject) => {
+            // Check if router is enabled
+            const settings = await readSettings();
+            const useRouter = settings.router?.enabled ?? false;
+            let routerDetection = null;
 
-            if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
-                args.push('--mcp-config', JSON.stringify({ mcpServers: opts.mcpServers }));
-            }
-
-            if (opts.allowedTools && opts.allowedTools.length > 0) {
-                args.push('--allowedTools', opts.allowedTools.join(','));
-            }
-
-            // Add custom Claude arguments
-            if (opts.claudeArgs) {
-                args.push(...opts.claudeArgs)
+            if (useRouter) {
+                logger.debug('[claudeLocal] Router enabled, detecting configuration...');
+                routerDetection = await detectRouter(settings.router?.configPath);
+                if (!routerDetection.isInstalled) {
+                    logger.warn('[claudeLocal] Router enabled but not installed, falling back to direct Claude Code');
+                } else if (routerDetection.error) {
+                    logger.warn(`[claudeLocal] Router configuration issue: ${routerDetection.error}, falling back to direct Claude Code`);
+                }
             }
 
-            if (!claudeCliPath || !existsSync(claudeCliPath)) {
-                throw new Error('Claude local launcher not found. Please ensure VIBE_PROJECT_ROOT is set correctly for development.');
+            let executable: string;
+            let args: string[] = [];
+            let useRouterSpawn = false;
+
+            if (useRouter && routerDetection && routerDetection.isInstalled && !routerDetection.error) {
+                // Use router - set environment variables and use regular Claude Code
+                executable = 'node';
+                args.unshift(claudeCliPath);
+                // Router environment variables will be set below
+                useRouterSpawn = false; // Still use regular fd3 listening
+                logger.debug(`[claudeLocal] Using router with regular Claude Code and router environment variables`);
+            } else {
+                // Use direct Claude Code
+                executable = 'node';
+                if (startFrom) {
+                    args.push('--resume', startFrom)
+                }
+                args.push('--append-system-prompt', systemPrompt);
+
+                if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
+                    args.push('--mcp-config', JSON.stringify({ mcpServers: opts.mcpServers }));
+                }
+
+                if (opts.allowedTools && opts.allowedTools.length > 0) {
+                    args.push('--allowedTools', opts.allowedTools.join(','));
+                }
+
+                // Add custom Claude arguments
+                if (opts.claudeArgs) {
+                    args.push(...opts.claudeArgs)
+                }
+
+                if (!claudeCliPath || !existsSync(claudeCliPath)) {
+                    throw new Error('Claude local launcher not found. Please ensure VIBE_PROJECT_ROOT is set correctly for development.');
+                }
+
+                args.unshift(claudeCliPath);
             }
 
             // Prepare environment variables
@@ -107,15 +140,28 @@ export async function claudeLocal(opts: {
                 ...opts.claudeEnvVars
             }
 
-            const child = spawn('node', [claudeCliPath, ...args], {
-                stdio: ['inherit', 'inherit', 'inherit', 'pipe'],
+            // Set router environment variables if using router
+            if (useRouter && routerDetection && routerDetection.isInstalled && !routerDetection.error) {
+                env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456'
+                env.ANTHROPIC_AUTH_TOKEN = 'test' // Dummy token for router
+                env.API_TIMEOUT_MS = '600000'
+                env.NO_PROXY = '127.0.0.1'
+                env.DISABLE_TELEMETRY = 'true'
+                env.DISABLE_COST_WARNINGS = 'true'
+                // Unset bedrock if it exists
+                delete env.CLAUDE_CODE_USE_BEDROCK
+                logger.debug('[claudeLocal] Set router environment variables')
+            }
+
+            const child = spawn(executable, args, {
+                stdio: useRouterSpawn ? ['inherit', 'inherit', 'inherit'] : ['inherit', 'inherit', 'inherit', 'pipe'],
                 signal: opts.abort,
                 cwd: opts.path,
                 env,
             });
 
-            // Listen to the custom fd (fd 3) line by line
-            if (child.stdio[3]) {
+            // Listen to the custom fd (fd 3) line by line (only for direct Claude Code, not router)
+            if (!useRouterSpawn && child.stdio[3]) {
                 const rl = createInterface({
                     input: child.stdio[3] as any,
                     crlfDelay: Infinity
