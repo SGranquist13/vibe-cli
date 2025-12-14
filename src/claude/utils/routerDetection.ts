@@ -70,6 +70,8 @@ export interface RouterDetectionResult {
     config: RouterConfig | null
     warnings?: string[]
     error?: string
+    isServiceRunning?: boolean
+    serviceError?: string
 }
 
 /**
@@ -248,8 +250,10 @@ export function validateRouterConfig(config: RouterConfig): { valid: boolean; er
 
 /**
  * Detect and validate Claude Code Router installation
+ * @param configPath Optional custom config path
+ * @param checkService If true, also check if the service is running
  */
-export async function detectRouter(configPath?: string): Promise<RouterDetectionResult> {
+export async function detectRouter(configPath?: string, checkService: boolean = false): Promise<RouterDetectionResult> {
     const result: RouterDetectionResult = {
         isInstalled: false,
         executablePath: null,
@@ -283,6 +287,21 @@ export async function detectRouter(configPath?: string): Promise<RouterDetection
     if (!validation.valid) {
         result.error = `Router config validation failed: ${validation.errors.join(', ')}`
         return result
+    }
+
+    // Optionally check service status
+    if (checkService) {
+        try {
+            const { checkRouterServiceStatus } = await import('./routerService')
+            const serviceStatus = await checkRouterServiceStatus()
+            result.isServiceRunning = serviceStatus.isRunning
+            if (!serviceStatus.isRunning && serviceStatus.error) {
+                result.serviceError = serviceStatus.error
+            }
+        } catch (error) {
+            logger.debug(`[routerDetection] Failed to check service status: ${error}`)
+            result.serviceError = 'Could not check service status'
+        }
     }
 
     logger.debug('[routerDetection] Claude Code Router detected and configured')

@@ -10,6 +10,7 @@ import { projectPath } from "@/projectPath";
 import { systemPrompt } from "./utils/systemPrompt";
 import { readSettings } from "@/persistence";
 import { detectRouter, getCcrSpawnConfig } from "./utils/routerDetection";
+import chalk from 'chalk';
 
 
 // Get Claude CLI path from project root
@@ -82,16 +83,43 @@ export async function claudeLocal(opts: {
         await new Promise<void>(async (r, reject) => {
             // Check if router is enabled
             const settings = await readSettings();
-            const useRouter = settings.router?.enabled ?? false;
+            let useRouter = settings.router?.enabled ?? false;
             let routerDetection = null;
 
             if (useRouter) {
                 logger.debug('[claudeLocal] Router enabled, detecting configuration...');
                 routerDetection = await detectRouter(settings.router?.configPath);
                 if (!routerDetection.isInstalled) {
+                    console.log(chalk.yellow('⚠️  Claude Code Router is enabled but not installed.'));
+                    console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                    console.log(chalk.gray('   To install: npm install -g @musistudio/claude-code-router'));
+                    console.log(chalk.gray('   To disable: vibe router disable'));
                     logger.warn('[claudeLocal] Router enabled but not installed, falling back to direct Claude Code');
+                    useRouter = false; // Disable router usage
                 } else if (routerDetection.error) {
+                    console.log(chalk.yellow('⚠️  Claude Code Router is enabled but has configuration issues.'));
+                    console.log(chalk.yellow(`   ${routerDetection.error}`));
+                    console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                    console.log(chalk.gray('   To fix: Run "ccr model" to configure, or "vibe router disable" to disable.'));
                     logger.warn(`[claudeLocal] Router configuration issue: ${routerDetection.error}, falling back to direct Claude Code`);
+                    useRouter = false; // Disable router usage
+                } else {
+                    // Router is installed and configured, check service status
+                    try {
+                        const { checkRouterServiceStatus } = await import('./utils/routerService');
+                        const serviceStatus = await checkRouterServiceStatus();
+                        if (!serviceStatus.isRunning) {
+                            console.log(chalk.yellow('⚠️  Claude Code Router is configured but service is not running.'));
+                            console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                            console.log(chalk.gray('   To start service: Run "ccr start" manually.'));
+                            logger.warn('[claudeLocal] Router configured but service not running, falling back to direct Claude Code');
+                            useRouter = false; // Disable router usage
+                        }
+                    } catch (error) {
+                        logger.debug(`[claudeLocal] Failed to check router service status: ${error}`);
+                        // If we can't check service status, don't use router to be safe
+                        useRouter = false;
+                    }
                 }
             }
 
@@ -99,6 +127,7 @@ export async function claudeLocal(opts: {
             let args: string[] = [];
             let useRouterSpawn = false;
 
+            // Only use router if it's enabled, detected, and service is running
             if (useRouter && routerDetection && routerDetection.isInstalled && !routerDetection.error) {
                 // Use router - set environment variables and use regular Claude Code
                 executable = 'node';

@@ -104,11 +104,27 @@ async function showRouterStatus(): Promise<void> {
     if (routerEnabled) {
         console.log(chalk.green('✓ Enabled'));
 
-        const detection = await detectRouter(settings.router?.configPath);
+        const detection = await detectRouter(settings.router?.configPath, true); // Check service status
 
         if (detection.isInstalled) {
             console.log(chalk.gray(`  Executable: ${detection.executablePath}`));
             console.log(chalk.gray(`  Config: ${detection.configPath}`));
+
+            // Show service status
+            if (detection.isServiceRunning !== undefined) {
+                if (detection.isServiceRunning) {
+                    console.log(chalk.green('  Service: Running'));
+                } else {
+                    console.log(chalk.red('  Service: Not running'));
+                    if (detection.serviceError) {
+                        console.log(chalk.yellow(`    ${detection.serviceError}`));
+                    }
+                    console.log(chalk.yellow('\n  To start service:'));
+                    console.log(chalk.cyan('    ccr start'));
+                }
+            } else {
+                console.log(chalk.gray('  Service: Status unknown'));
+            }
 
             if (detection.warnings && detection.warnings.length > 0) {
                 console.log(chalk.yellow('\n  Warnings:'));
@@ -116,24 +132,26 @@ async function showRouterStatus(): Promise<void> {
             }
 
             if (detection.config) {
-                const providers = detection.config.providers || [];
+                const providers = detection.config.providers || detection.config.Providers || [];
                 if (providers.length > 0) {
-                    console.log(chalk.gray(`  Providers: ${providers.map(p => p.name).join(', ')}`));
+                    const providerNames = providers.map((p: any) => p.name || 'Unknown').join(', ');
+                    console.log(chalk.gray(`\n  Providers: ${providerNames}`));
                 }
 
-                if (detection.config.router) {
+                const routerConfig = detection.config.router || detection.config.Router;
+                if (routerConfig) {
                     console.log(chalk.gray('\n  Router Configuration:'));
-                    if (detection.config.router.default) {
-                        console.log(chalk.gray(`    Default: ${detection.config.router.default}`));
+                    if (routerConfig.default) {
+                        console.log(chalk.gray(`    Default: ${routerConfig.default}`));
                     }
-                    if (detection.config.router.background) {
-                        console.log(chalk.gray(`    Background: ${detection.config.router.background}`));
+                    if (routerConfig.background) {
+                        console.log(chalk.gray(`    Background: ${routerConfig.background}`));
                     }
-                    if (detection.config.router.think) {
-                        console.log(chalk.gray(`    Think: ${detection.config.router.think}`));
+                    if (routerConfig.think) {
+                        console.log(chalk.gray(`    Think: ${routerConfig.think}`));
                     }
-                    if (detection.config.router.longContext) {
-                        console.log(chalk.gray(`    Long Context: ${detection.config.router.longContext}`));
+                    if (routerConfig.longContext) {
+                        console.log(chalk.gray(`    Long Context: ${routerConfig.longContext}`));
                     }
                 }
             }

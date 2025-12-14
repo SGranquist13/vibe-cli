@@ -30,7 +30,7 @@ interface Settings {
 const defaultSettings: Settings = {
   onboardingCompleted: false,
   router: {
-    enabled: false
+    enabled: true
   }
 }
 

@@ -22,6 +22,7 @@ import { startVibeServer } from '@/claude/utils/startVibeServer';
 import { registerKillSessionHandler } from './registerKillSessionHandler';
 import { projectPath } from '../projectPath';
 import { resolve } from 'node:path';
+import chalk from 'chalk';
 
 export interface StartOptions {
     model?: string
@@ -90,6 +91,8 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     };
     const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
     logger.debug(`Session created: ${response.id}`);
+    console.log(chalk.blue(`📱 Session created: ${response.id}`));
+    console.log(chalk.gray('   Check your mobile app - the session should appear shortly.'));
 
     // Always report to daemon if it exists
     try {
@@ -120,8 +123,102 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         }
     });
 
-    // Create realtime session
+    // Create realtime session and connect WebSocket immediately
+    // This ensures the session is visible in mobile app right away
     const session = api.sessionSyncClient(response);
+    
+    // Set initial agent state immediately so session is fully initialized
+    session.updateAgentState((currentState) => ({
+        ...currentState,
+        controlledByUser: options.startingMode !== 'remote'
+    }));
+    
+    // Wait for WebSocket to connect (with timeout)
+    const socket = (session as any).socket;
+    if (socket) {
+        if (socket.connected) {
+            logger.debug('[runClaude] WebSocket already connected');
+        } else {
+            logger.debug('[runClaude] Waiting for WebSocket connection...');
+            await new Promise<void>((resolve) => {
+                const timeout = setTimeout(() => {
+                    logger.debug('[runClaude] WebSocket connection timeout - continuing anyway');
+                    resolve();
+                }, 3000);
+                
+                socket.once('connect', () => {
+                    clearTimeout(timeout);
+                    logger.debug('[runClaude] WebSocket connected successfully');
+                    resolve();
+                });
+                
+                socket.once('connect_error', (error: any) => {
+                    clearTimeout(timeout);
+                    logger.debug(`[runClaude] WebSocket connection error: ${error.message || error}`);
+                    resolve(); // Continue anyway
+                });
+            });
+        }
+    }
+    
+    // Give a moment for initial state to be sent
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Check router settings and ensure service is running if enabled (after WebSocket connection)
+    // Do this in background so it doesn't block session initialization
+    const routerSettings = await readSettings();
+    const routerEnabled = routerSettings.router?.enabled ?? false;
+    
+    if (routerEnabled) {
+        // Run router check in background - don't await it
+        (async () => {
+            try {
+                logger.debug('[runClaude] Router is enabled, checking service status...');
+                const { detectRouter } = await import('@/claude/utils/routerDetection');
+                const { ensureRouterServiceRunning } = await import('@/claude/utils/routerService');
+                
+                const routerDetection = await detectRouter(routerSettings.router?.configPath, false);
+                
+                if (routerDetection.isInstalled && !routerDetection.error) {
+                    // Router is installed and configured, ensure service is running
+                    const serviceResult = await ensureRouterServiceRunning();
+                    
+                    if (serviceResult.isRunning) {
+                        if (serviceResult.wasStarted) {
+                            console.log(chalk.green('✓ Claude Code Router service started'));
+                            logger.debug('[runClaude] Claude Code Router service started');
+                        } else {
+                            logger.debug('[runClaude] Claude Code Router service is already running');
+                        }
+                    } else {
+                        // Service couldn't be started - warn but continue
+                        console.log(chalk.yellow('⚠️  Claude Code Router is enabled but service is not running.'));
+                        console.log(chalk.yellow(`   ${serviceResult.error || 'Could not start service'}`));
+                        console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                        console.log(chalk.gray('   To fix: Run "ccr start" manually or check router installation.'));
+                        logger.warn('[runClaude] Router enabled but service unavailable, falling back to direct Claude Code');
+                    }
+                } else {
+                    // Router not installed or misconfigured - warn but continue
+                    if (!routerDetection.isInstalled) {
+                        console.log(chalk.yellow('⚠️  Claude Code Router is enabled but not installed.'));
+                        console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                        console.log(chalk.gray('   To install: npm install -g @musistudio/claude-code-router'));
+                        console.log(chalk.gray('   To disable: vibe router disable'));
+                    } else if (routerDetection.error) {
+                        console.log(chalk.yellow('⚠️  Claude Code Router is enabled but has configuration issues.'));
+                        console.log(chalk.yellow(`   ${routerDetection.error}`));
+                        console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                        console.log(chalk.gray('   To fix: Run "ccr model" to configure, or "vibe router disable" to disable.'));
+                    }
+                    logger.warn(`[runClaude] Router enabled but unavailable: ${routerDetection.error || 'not installed'}, falling back to direct Claude Code`);
+                }
+            } catch (error) {
+                logger.debug(`[runClaude] Error checking router service: ${error}`);
+                // Continue with direct Claude Code on error
+            }
+        })();
+    }
 
     // Start Vibe MCP server
     const vibeServer = await startVibeServer(session);
@@ -132,11 +229,6 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     logger.infoDeveloper(`Session: ${response.id}`);
     logger.infoDeveloper(`Logs: ${logPath}`);
 
-    // Set initial agent state
-    session.updateAgentState((currentState) => ({
-        ...currentState,
-        controlledByUser: options.startingMode !== 'remote'
-    }));
 
     // Start caffeinate to prevent sleep on macOS
     const caffeinateStarted = startCaffeinate();

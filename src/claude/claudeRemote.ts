@@ -12,6 +12,7 @@ import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import { detectRouter, getCcrSpawnConfig } from "./utils/routerDetection";
 import { readSettings } from "@/persistence";
+import chalk from 'chalk';
 
 export async function claudeRemote(opts: {
 
@@ -90,9 +91,36 @@ export async function claudeRemote(opts: {
         useRouter = routerDetection.isInstalled && !routerDetection.error;
 
         if (useRouter) {
-            logger.debug('[claudeRemote] Claude Code Router enabled and will be used');
-            logger.debug(`[claudeRemote] Router config path: ${routerDetection.configPath}`);
+            // Check service status
+            try {
+                const { checkRouterServiceStatus } = await import('./utils/routerService');
+                const serviceStatus = await checkRouterServiceStatus();
+                if (serviceStatus.isRunning) {
+                    logger.debug('[claudeRemote] Claude Code Router enabled and will be used');
+                    logger.debug(`[claudeRemote] Router config path: ${routerDetection.configPath}`);
+                } else {
+                    console.log(chalk.yellow('⚠️  Claude Code Router is configured but service is not running.'));
+                    console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                    console.log(chalk.gray('   To start service: Run "ccr start" manually.'));
+                    logger.warn('[claudeRemote] Router configured but service not running, falling back to direct Claude Code');
+                    useRouter = false;
+                }
+            } catch (error) {
+                logger.debug(`[claudeRemote] Failed to check router service status: ${error}`);
+                // Continue with router enabled - service check is best effort
+            }
         } else if (routerDetection.error) {
+            if (!routerDetection.isInstalled) {
+                console.log(chalk.yellow('⚠️  Claude Code Router is enabled but not installed.'));
+                console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                console.log(chalk.gray('   To install: npm install -g @musistudio/claude-code-router'));
+                console.log(chalk.gray('   To disable: vibe router disable'));
+            } else {
+                console.log(chalk.yellow('⚠️  Claude Code Router is enabled but has configuration issues.'));
+                console.log(chalk.yellow(`   ${routerDetection.error}`));
+                console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                console.log(chalk.gray('   To fix: Run "ccr model" to configure, or "vibe router disable" to disable.'));
+            }
             logger.warn(`[claudeRemote] Router enabled but not available: ${routerDetection.error}`);
             logger.warn('[claudeRemote] Falling back to default Claude Code');
         }

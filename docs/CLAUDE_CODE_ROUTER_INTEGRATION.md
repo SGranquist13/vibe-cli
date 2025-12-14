@@ -253,3 +253,4 @@ vibe                 # Start Claude with router
 - [Claude Code Router GitHub](https://github.com/musistudio/claude-code-router)
 - [Claude Code Integration](./CLAUDE_CODE_INTEGRATION.md)
 - [Vibe Quick Start](../../../../QUICK_START.md)
+
