@@ -12,6 +12,7 @@ import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import { detectRouter, getCcrSpawnConfig } from "./utils/routerDetection";
 import { readSettings } from "@/persistence";
+import { checkRouterServiceStatus } from "./utils/routerService";
 import chalk from 'chalk';
 
 export async function claudeRemote(opts: {
@@ -91,23 +92,33 @@ export async function claudeRemote(opts: {
         useRouter = routerDetection.isInstalled && !routerDetection.error;
 
         if (useRouter) {
-            // Check service status
+            // Ensure service is running
             try {
-                const { checkRouterServiceStatus } = await import('./utils/routerService');
-                const serviceStatus = await checkRouterServiceStatus();
-                if (serviceStatus.isRunning) {
+                const { ensureRouterServiceRunning } = await import('./utils/routerService');
+                // Give service a moment to start if it was just launched
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const serviceResult = await ensureRouterServiceRunning();
+                
+                if (serviceResult.isRunning) {
                     logger.debug('[claudeRemote] Claude Code Router enabled and will be used');
                     logger.debug(`[claudeRemote] Router config path: ${routerDetection.configPath}`);
+                    if (serviceResult.wasStarted) {
+                        logger.debug('[claudeRemote] Router service was started successfully');
+                    }
                 } else {
                     console.log(chalk.yellow('⚠️  Claude Code Router is configured but service is not running.'));
                     console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                    if (serviceResult.error) {
+                        console.log(chalk.gray(`   ${serviceResult.error}`));
+                    }
                     console.log(chalk.gray('   To start service: Run "ccr start" manually.'));
                     logger.warn('[claudeRemote] Router configured but service not running, falling back to direct Claude Code');
                     useRouter = false;
                 }
             } catch (error) {
-                logger.debug(`[claudeRemote] Failed to check router service status: ${error}`);
-                // Continue with router enabled - service check is best effort
+                logger.warn(`[claudeRemote] Failed to ensure router service is running: ${error}`);
+                logger.warn('[claudeRemote] Falling back to direct Claude Code due to service check failure');
+                useRouter = false;
             }
         } else if (routerDetection.error) {
             if (!routerDetection.isInstalled) {
@@ -160,6 +171,23 @@ export async function claudeRemote(opts: {
 
     // Prepare SDK options
     let mode = initial.mode;
+
+    // Final check: if router was enabled but we disabled it due to service not running,
+    // check one more time right before using it (service might have started)
+    if (!useRouter && routerEnabled && routerDetection && routerDetection.isInstalled && !routerDetection.error) {
+        try {
+            const { checkRouterServiceStatus } = await import('./utils/routerService');
+            // Wait a bit more for service to fully start
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const finalCheck = await checkRouterServiceStatus();
+            if (finalCheck.isRunning) {
+                logger.debug('[claudeRemote] Router service is now running, enabling router usage');
+                useRouter = true;
+            }
+        } catch (error) {
+            logger.debug(`[claudeRemote] Final router service check failed: ${error}`);
+        }
+    }
 
     // Configure executable based on router availability
     let executable = 'node';

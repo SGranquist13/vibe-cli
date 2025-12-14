@@ -15,7 +15,7 @@ const execAsync = promisify(exec)
 
 async function tryExec(command: string): Promise<boolean> {
     try {
-        await execAsync(command)
+        await execAsync(command, { timeout: 2500 }) // 2s + 500ms buffer
         return true
     } catch {
         return false
@@ -103,29 +103,12 @@ export async function getCcrExecutablePath(): Promise<string | null> {
         return resolved
     }
 
-    const locator = process.platform === 'win32' ? 'where ccr' : 'which ccr'
-
-    try {
-        const { stdout } = await execAsync(locator)
-        const path = stdout
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .find((line) => line.length > 0)
-
-        if (path) {
-            return path
-        }
-    } catch {
-        // ignore, continue to fallbacks
+    // Verify npx exists before returning it as fallback
+    if (await tryExec('npx --version')) {
+        return 'npx'
     }
 
-    // If the executable resolves in PATH, return the command name directly
-    if (await tryExec('ccr --version')) {
-        return 'ccr'
-    }
-
-    // Fallback to npx if not globally installed
-    return 'npx'
+    return null
 }
 
 /**
@@ -224,19 +207,19 @@ export function validateRouterConfig(config: RouterConfig): { valid: boolean; er
     // Check for providers (support both lowercase and uppercase)
     const providers = config.providers || config.Providers
     if (!providers || providers.length === 0) {
-        warnings.push('No providers configured')
+        errors.push('No providers configured')
     }
 
     if (providers) {
         providers.forEach((provider, index) => {
             if (!provider.name) {
-                warnings.push(`Provider at index ${index} missing name`)
+                errors.push(`Provider at index ${index} missing name`)
             }
             // Check for apiEndpoint or api_base_url (handle both provider formats)
             const hasApiEndpoint = 'apiEndpoint' in provider ? !!provider.apiEndpoint :
                                  'api_base_url' in provider ? !!provider.api_base_url : false
             if (!hasApiEndpoint) {
-                warnings.push(`Provider "${provider.name}" missing apiEndpoint/api_base_url`)
+                errors.push(`Provider "${provider.name || `at index ${index}`}" missing apiEndpoint/api_base_url`)
             }
         })
     }
@@ -289,7 +272,7 @@ export async function detectRouter(configPath?: string, checkService: boolean = 
         return result
     }
 
-    // Optionally check service status
+    // Optionally check service status (dynamic import to avoid circular dependency)
     if (checkService) {
         try {
             const { checkRouterServiceStatus } = await import('./routerService')

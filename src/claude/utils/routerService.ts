@@ -19,40 +19,75 @@ export interface RouterServiceStatus {
 
 /**
  * Check if port 3456 is listening (CCR service port)
+ * Uses net.connect for more reliable port detection
  */
 async function checkPort3456(): Promise<boolean> {
     try {
-        const http = await import('http')
+        const net = await import('net')
         return new Promise((resolve) => {
+            const socket = new net.Socket()
+            let resolved = false
+            
+            const cleanup = () => {
+                if (!resolved) {
+                    resolved = true
+                    try {
+                        socket.destroy()
+                    } catch {
+                        // Ignore cleanup errors
+                    }
+                }
+            }
+            
+            // Set timeout
+            const timeout = setTimeout(() => {
+                cleanup()
+                resolve(false)
+            }, 3000) // Increased to 3 seconds
+            
+            socket.on('connect', () => {
+                clearTimeout(timeout)
+                cleanup()
+                resolve(true)
+            })
+            
+            socket.on('error', () => {
+                clearTimeout(timeout)
+                cleanup()
+                resolve(false)
+            })
+            
+            // Try to connect
             try {
-                const req = http.request({
-                    hostname: '127.0.0.1',
-                    port: 3456,
-                    path: '/',
-                    method: 'GET',
-                    timeout: 2000
-                }, (res) => {
-                    // Any response means service is running
-                    resolve(true)
-                })
-                
-                req.on('error', () => {
-                    resolve(false)
-                })
-                
-                req.on('timeout', () => {
-                    req.destroy()
-                    resolve(false)
-                })
-                
-                req.end()
+                socket.connect(3456, '127.0.0.1')
             } catch {
+                clearTimeout(timeout)
+                cleanup()
                 resolve(false)
             }
         })
     } catch {
         return false
     }
+}
+
+/**
+ * Check port 3456 with retries (service may take time to start)
+ */
+async function checkPort3456WithRetries(maxRetries: number = 3, delayMs: number = 1000): Promise<boolean> {
+    for (let i = 0; i < maxRetries; i++) {
+        const isRunning = await checkPort3456()
+        if (isRunning) {
+            return true
+        }
+        
+        // Wait before retry (except on last attempt)
+        if (i < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+        }
+    }
+    
+    return false
 }
 
 /**
@@ -68,8 +103,8 @@ export async function checkRouterServiceStatus(): Promise<RouterServiceStatus> {
             }
         }
 
-        // First, try to check port 3456 directly (most reliable)
-        const portCheck = await checkPort3456()
+        // First, try to check port 3456 directly (most reliable) with retries
+        const portCheck = await checkPort3456WithRetries(3, 1000)
         if (portCheck) {
             logger.debug('[routerService] Port 3456 is listening - service is running')
             return {
@@ -77,6 +112,8 @@ export async function checkRouterServiceStatus(): Promise<RouterServiceStatus> {
                 details: 'Service detected on port 3456'
             }
         }
+        
+        logger.debug('[routerService] Port 3456 check failed, trying ccr status command...')
 
         // If port check fails, try ccr status command
         let command: string
@@ -97,11 +134,17 @@ export async function checkRouterServiceStatus(): Promise<RouterServiceStatus> {
 
             // Parse output to determine if service is running
             const output = (stdout || stderr || '').toLowerCase()
-            const hasRunning = output.includes('running') || output.includes('active') || output.includes('listening')
-            const hasStopped = output.includes('not running') || output.includes('stopped') || output.includes('error')
+            logger.debug(`[routerService] ccr status output: ${output.substring(0, 200)}`)
+            
+            // More lenient detection - if command succeeded and we don't see explicit "not running", assume it's running
+            const hasRunning = output.includes('running') || output.includes('active') || output.includes('listening') || 
+                               output.includes('started') || output.includes('ready') || output.includes('port 3456')
+            const hasStopped = output.includes('not running') || output.includes('stopped') || 
+                              (output.includes('error') && !output.includes('no error'))
             
             // If we see explicit "running" indicators, trust that
             if (hasRunning && !hasStopped) {
+                logger.debug('[routerService] Service detected as running from ccr status command')
                 return {
                     isRunning: true,
                     details: stdout || stderr || 'Service status checked'
@@ -110,14 +153,28 @@ export async function checkRouterServiceStatus(): Promise<RouterServiceStatus> {
             
             // If we see explicit "stopped" indicators, service is not running
             if (hasStopped) {
+                logger.debug('[routerService] Service detected as not running from ccr status command')
                 return {
                     isRunning: false,
                     error: 'Service is not running',
                     details: stdout || stderr || 'Service status checked'
                 }
             }
-
-            // Ambiguous output - default to not running if port check also failed
+            
+            // If command succeeded but output is ambiguous, try port check one more time
+            // (service might have just started)
+            logger.debug('[routerService] Ambiguous output, retrying port check...')
+            const retryPortCheck = await checkPort3456WithRetries(2, 500)
+            if (retryPortCheck) {
+                logger.debug('[routerService] Service detected via port check after ambiguous command output')
+                return {
+                    isRunning: true,
+                    details: 'Service detected on port 3456 (after retry)'
+                }
+            }
+            
+            // Ambiguous output and port check failed - default to not running
+            logger.debug('[routerService] Could not determine service status from command output or port check')
             return {
                 isRunning: false,
                 error: 'Could not determine service status from command output',

@@ -24,6 +24,67 @@ import { projectPath } from '../projectPath';
 import { resolve } from 'node:path';
 import chalk from 'chalk';
 
+/**
+ * Display router status at startup
+ */
+async function displayRouterStatus(settings: Awaited<ReturnType<typeof readSettings>>): Promise<void> {
+    const routerEnabled = settings.router?.enabled ?? false;
+    
+    if (routerEnabled) {
+        // Router is enabled - check if it's properly configured and running
+        try {
+            const { detectRouter } = await import('@/claude/utils/routerDetection');
+            const { checkRouterServiceStatus } = await import('@/claude/utils/routerService');
+            
+            const routerDetection = await detectRouter(settings.router?.configPath, false);
+            
+            if (routerDetection.isInstalled && !routerDetection.error) {
+                // Router is installed and configured - ensure service is running
+                const { ensureRouterServiceRunning } = await import('@/claude/utils/routerService');
+                // Give service a moment to start if it was just launched
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const serviceResult = await ensureRouterServiceRunning();
+                
+                if (serviceResult.isRunning) {
+                    if (serviceResult.wasStarted) {
+                        console.log(chalk.green('✓ Claude Code Router: Enabled and running (service started)'));
+                    } else {
+                        console.log(chalk.green('✓ Claude Code Router: Enabled and running'));
+                    }
+                    logger.debug('[runClaude] Router is enabled, installed, configured, and service is running');
+                } else {
+                    console.log(chalk.yellow('⚠️  Claude Code Router: Enabled but service is not running'));
+                    if (serviceResult.error) {
+                        console.log(chalk.gray(`   ${serviceResult.error}`));
+                    }
+                    console.log(chalk.gray('   To start service: ccr start'));
+                    logger.debug(`[runClaude] Router is enabled but service is not running: ${serviceResult.error || 'unknown'}`);
+                }
+            } else {
+                // Router is enabled but not properly configured
+                if (!routerDetection.isInstalled) {
+                    console.log(chalk.yellow('⚠️  Claude Code Router: Enabled but not installed'));
+                    console.log(chalk.gray('   To install: npm install -g @musistudio/claude-code-router'));
+                    console.log(chalk.gray('   To disable: vibe router disable'));
+                } else if (routerDetection.error) {
+                    console.log(chalk.yellow('⚠️  Claude Code Router: Enabled but has configuration issues'));
+                    console.log(chalk.gray(`   ${routerDetection.error}`));
+                    console.log(chalk.gray('   To fix: Run "ccr model" to configure, or "vibe router disable" to disable'));
+                }
+                logger.debug(`[runClaude] Router is enabled but not available: ${routerDetection.error || 'not installed'}`);
+            }
+        } catch (error) {
+            logger.debug(`[runClaude] Error checking router status: ${error}`);
+            // Don't block startup on router check errors
+        }
+    } else {
+        // Router is disabled - suggest enabling it
+        console.log(chalk.gray('ℹ️  Claude Code Router: Disabled (using default Claude Code)'));
+        console.log(chalk.gray('   To enable router: vibe router enable'));
+        logger.debug('[runClaude] Router is disabled');
+    }
+}
+
 export interface StartOptions {
     model?: string
     permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
@@ -93,6 +154,9 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     logger.debug(`Session created: ${response.id}`);
     console.log(chalk.blue(`📱 Session created: ${response.id}`));
     console.log(chalk.gray('   Check your mobile app - the session should appear shortly.'));
+    
+    // Display router status early in startup
+    await displayRouterStatus(settings);
 
     // Always report to daemon if it exists
     try {

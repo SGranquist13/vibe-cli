@@ -25,7 +25,6 @@ import {
 import { getDefaultClaudeCodePath, logDebug, streamToStdin } from './utils'
 import type { Writable } from 'node:stream'
 import { logger } from '@/ui/logger'
-import { detectRouter, getCcrSpawnConfig } from '@/claude/utils/routerDetection'
 
 /**
  * Query class manages Claude Code process interaction
@@ -327,9 +326,10 @@ export function query(config: {
     let finalArgs: string[] = []
 
     if (useRouter) {
-        // Router mode: use detectRouter synchronously or expect caller to provide executable
-        // For now, we'll use a simple approach where if useRouter is true,
-        // we expect the caller to have set appropriate executable and executableArgs
+        // Router mode: validate that caller has provided appropriate executable and executableArgs
+        if (!executable || executableArgs.length === 0) {
+            throw new Error('Router mode requires explicit executable and executableArgs to be provided. Ensure router detection has been performed and spawn config is set.')
+        }
         logger.debug('[query] Using Claude Code Router mode')
         finalExecutable = executable
         finalArgs = [...executableArgs, ...args]

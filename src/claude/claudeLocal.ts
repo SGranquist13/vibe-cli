@@ -104,22 +104,51 @@ export async function claudeLocal(opts: {
                     logger.warn(`[claudeLocal] Router configuration issue: ${routerDetection.error}, falling back to direct Claude Code`);
                     useRouter = false; // Disable router usage
                 } else {
-                    // Router is installed and configured, check service status
+                    // Router is installed and configured, ensure service is running
                     try {
-                        const { checkRouterServiceStatus } = await import('./utils/routerService');
-                        const serviceStatus = await checkRouterServiceStatus();
-                        if (!serviceStatus.isRunning) {
+                        const { ensureRouterServiceRunning } = await import('./utils/routerService');
+                        // Give service a moment to start if it was just launched
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        const serviceResult = await ensureRouterServiceRunning();
+                        
+                        if (!serviceResult.isRunning) {
                             console.log(chalk.yellow('⚠️  Claude Code Router is configured but service is not running.'));
                             console.log(chalk.yellow('   Falling back to direct Claude Code.'));
+                            if (serviceResult.error) {
+                                console.log(chalk.gray(`   ${serviceResult.error}`));
+                            }
                             console.log(chalk.gray('   To start service: Run "ccr start" manually.'));
                             logger.warn('[claudeLocal] Router configured but service not running, falling back to direct Claude Code');
                             useRouter = false; // Disable router usage
+                        } else {
+                            if (serviceResult.wasStarted) {
+                                logger.debug('[claudeLocal] Router service was started successfully');
+                            } else {
+                                logger.debug('[claudeLocal] Router service was already running');
+                            }
                         }
                     } catch (error) {
-                        logger.debug(`[claudeLocal] Failed to check router service status: ${error}`);
-                        // If we can't check service status, don't use router to be safe
+                        logger.debug(`[claudeLocal] Failed to ensure router service is running: ${error}`);
+                        // If we can't ensure service is running, don't use router to be safe
                         useRouter = false;
                     }
+                }
+            }
+
+            // Final check: if router was enabled but we disabled it due to service not running,
+            // check one more time right before spawning (service might have started)
+            if (!useRouter && settings.router?.enabled && routerDetection && routerDetection.isInstalled && !routerDetection.error) {
+                try {
+                    const { checkRouterServiceStatus } = await import('./utils/routerService');
+                    // Wait a bit more for service to fully start
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    const finalCheck = await checkRouterServiceStatus();
+                    if (finalCheck.isRunning) {
+                        logger.debug('[claudeLocal] Router service is now running, enabling router usage');
+                        useRouter = true;
+                    }
+                } catch (error) {
+                    logger.debug(`[claudeLocal] Final router service check failed: ${error}`);
                 }
             }
 
@@ -190,7 +219,7 @@ export async function claudeLocal(opts: {
             });
 
             // Listen to the custom fd (fd 3) line by line (only for direct Claude Code, not router)
-            if (!useRouterSpawn && child.stdio[3]) {
+            if (!useRouter && child.stdio[3]) {
                 const rl = createInterface({
                     input: child.stdio[3] as any,
                     crlfDelay: Infinity
@@ -257,7 +286,7 @@ export async function claudeLocal(opts: {
                 });
 
                 rl.on('error', (err) => {
-                    console.error('Error reading from fd 3:', err);
+                    logger.warn('[claudeLocal] Error reading from fd 3:', err);
                 });
 
                 // Cleanup on child exit
