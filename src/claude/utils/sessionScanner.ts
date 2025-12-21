@@ -11,9 +11,11 @@ export async function createSessionScanner(opts: {
     workingDirectory: string
     onMessage: (message: RawJSONLines) => void
 }) {
+    logger.debug(`[SESSION_SCANNER] Creating scanner with sessionId: ${opts.sessionId}, workingDirectory: ${opts.workingDirectory}`);
 
     // Resolve project directory
     const projectDir = getProjectPath(opts.workingDirectory);
+    logger.debug(`[SESSION_SCANNER] Project directory: ${projectDir}`);
 
     // Finished, pending finishing and current session
     let finishedSessions = new Set<string>();
@@ -24,10 +26,14 @@ export async function createSessionScanner(opts: {
 
     // Mark existing messages as processed
     if (opts.sessionId) {
+        logger.debug(`[SESSION_SCANNER] Initial session ID provided: ${opts.sessionId}, marking existing messages as processed`);
         let messages = await readSessionLog(projectDir, opts.sessionId);
+        logger.debug(`[SESSION_SCANNER] Found ${messages.length} existing messages to mark as processed`);
         for (let m of messages) {
             processedMessageKeys.add(messageKey(m));
         }
+    } else {
+        logger.debug(`[SESSION_SCANNER] No initial session ID, will wait for onNewSession to be called`);
     }
 
     // Main sync function
@@ -45,12 +51,16 @@ export async function createSessionScanner(opts: {
 
         // Process sessions
         for (let session of sessions) {
-            for (let file of await readSessionLog(projectDir, session)) {
+            const messages = await readSessionLog(projectDir, session);
+            logger.debug(`[SESSION_SCANNER] Processing ${messages.length} messages from session ${session}`);
+            for (let file of messages) {
                 let key = messageKey(file);
                 if (processedMessageKeys.has(key)) {
+                    logger.debug(`[SESSION_SCANNER] Message ${key} already processed, skipping`);
                     continue;
                 }
                 processedMessageKeys.add(key);
+                logger.debug(`[SESSION_SCANNER] Processing new message type: ${file.type}, key: ${key}`);
                 opts.onMessage(file);
             }
         }
@@ -88,22 +98,31 @@ export async function createSessionScanner(opts: {
         },
         onNewSession: (sessionId: string) => {
             if (currentSessionId === sessionId) {
-                logger.debug(`[SESSION_SCANNER] New session: ${sessionId} is the same as the current session, skipping`);
+                logger.debug(`[SESSION_SCANNER] New session: ${sessionId} is the same as the current session, forcing sync`);
+                // Force sync even if it's the same session to pick up any new messages
+                sync.invalidate();
                 return;
             }
             if (finishedSessions.has(sessionId)) {
-                logger.debug(`[SESSION_SCANNER] New session: ${sessionId} is already finished, skipping`);
+                logger.debug(`[SESSION_SCANNER] New session: ${sessionId} is already finished, but forcing sync to check for new messages`);
+                // Even if finished, we should check for new messages
+                sync.invalidate();
                 return;
             }
             if (pendingSessions.has(sessionId)) {
-                logger.debug(`[SESSION_SCANNER] New session: ${sessionId} is already pending, skipping`);
-                return;
+                logger.debug(`[SESSION_SCANNER] New session: ${sessionId} is already pending, promoting to current and syncing`);
+                // Promote pending session to current
+                pendingSessions.delete(sessionId);
             }
             if (currentSessionId) {
                 pendingSessions.add(currentSessionId);
             }
-            logger.debug(`[SESSION_SCANNER] New session: ${sessionId}`)
+            logger.debug(`[SESSION_SCANNER] New session: ${sessionId}, previous: ${currentSessionId}`)
             currentSessionId = sessionId;
+            // Ensure file watcher is set up and force immediate sync
+            sync.invalidate();
+        },
+        forceSync: () => {
             sync.invalidate();
         },
     }

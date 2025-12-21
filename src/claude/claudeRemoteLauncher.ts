@@ -338,10 +338,15 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                             let p = pending;
                             pending = null;
                             permissionHandler.handleModeChange(p.mode.permissionMode);
+                            // Display user message in UI
+                            messageBuffer.addMessage(`👤 User: ${p.message}`, 'user');
+                            logger.debug(`[remote] nextMessage: returning pending message: ${p.message.substring(0, 50)}...`);
                             return p;
                         }
 
+                        logger.debug(`[remote] nextMessage: waiting for message from queue (queue size: ${session.queue.size()})`);
                         let msg = await session.queue.waitForMessagesAndGetAsString(controller.signal);
+                        logger.debug(`[remote] nextMessage: received message from queue: ${msg ? msg.message.substring(0, 50) + '...' : 'null'}`);
 
                         // Check if mode has changed
                         if (msg) {
@@ -353,6 +358,8 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                             modeHash = msg.hash;
                             mode = msg.mode;
                             permissionHandler.handleModeChange(mode.permissionMode);
+                            // Display user message in UI
+                            messageBuffer.addMessage(`👤 User: ${msg.message}`, 'user');
                             return {
                                 message: msg.message,
                                 mode: msg.mode
@@ -400,9 +407,17 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                 }
             } catch (e) {
                 logger.debug('[remote]: launch error', e);
-                if (!exitReason) {
+                logger.debug(`[remote]: exitReason=${exitReason}, abortController=${abortController ? 'exists' : 'null'}, signalAborted=${abortController?.signal.aborted}`);
+                // Check if abort was intentional (exitReason set) or if signal was aborted
+                // Note: abortController might be null if error happens before it's set, so check both
+                const wasAborted = exitReason || (abortController && abortController.signal.aborted);
+                if (!wasAborted) {
+                    logger.debug('[remote]: Process exited unexpectedly - showing error to user');
                     session.client.sendSessionEvent({ type: 'message', message: 'Process exited unexpectedly' });
                     continue;
+                } else {
+                    // Intentional abort (mode switch or exit) - don't show error
+                    logger.debug('[remote]: launch aborted intentionally, not showing error');
                 }
             } finally {
 

@@ -25,6 +25,7 @@ import { runDoctorCommand } from './ui/doctor'
 import { listDaemonSessions, stopDaemonSession } from './daemon/controlClient'
 import { handleAuthCommand } from './commands/auth'
 import { handleConnectCommand } from './commands/connect'
+import { handleRouterCommand } from './commands/router'
 import { spawnVibeCLI } from './utils/spawnVibeCLI'
 import { claudeCliPath } from './claude/claudeLocal'
 import { execFileSync } from 'node:child_process'
@@ -77,8 +78,28 @@ import { execFileSync } from 'node:child_process'
       process.exit(1)
     }
     return;
+  } else if (subcommand === 'router') {
+    // Handle router subcommands
+    try {
+      await handleRouterCommand(args.slice(1));
+    } catch (error) {
+      console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
+      if (process.env.DEBUG) {
+        console.error(error)
+      }
+      process.exit(1)
+    }
+    return;
   } else if (subcommand === 'codex') {
     // Handle codex command
+    // Check if experimental features are enabled
+    const { configuration } = await import('@/configuration');
+    if (!configuration.isExperimentalEnabled) {
+      console.error(chalk.red('Error:'), 'Codex is an experimental feature. Enable it by setting VIBE_EXPERIMENTAL=true environment variable.')
+      process.exit(1)
+      return;
+    }
+    
     try {
       const { runCodex } = await import('@/codex/runCodex');
       
@@ -302,6 +323,7 @@ ${chalk.bold('To clean up runaway processes:')} Use ${chalk.cyan('vibe doctor cl
     // Parse command line arguments for main command
     const options: StartOptions = {}
     let showHelp = false
+    let showClaudeHelp = false
     let showVersion = false
     const unknownArgs: string[] = [] // Collect unknown args to pass through to claude
 
@@ -310,8 +332,8 @@ ${chalk.bold('To clean up runaway processes:')} Use ${chalk.cyan('vibe doctor cl
 
       if (arg === '-h' || arg === '--help') {
         showHelp = true
-        // Also pass through to claude
-        unknownArgs.push(arg)
+      } else if (arg === '--claude-help') {
+        showClaudeHelp = true
       } else if (arg === '-v' || arg === '--version') {
         showVersion = true
         // Also pass through to claude (will show after our version)
@@ -338,7 +360,24 @@ ${chalk.bold('To clean up runaway processes:')} Use ${chalk.cyan('vibe doctor cl
       options.claudeArgs = [...(options.claudeArgs || []), ...unknownArgs]
     }
 
-    // Show help
+    // Show Claude help
+    if (showClaudeHelp) {
+      console.log(`${chalk.bold.cyan('Claude Code Options (from `claude --help`):')}`)
+      console.log()
+
+      // Run claude --help and display its output
+      // Use execFileSync with the current Node executable for cross-platform compatibility
+      try {
+        const claudeHelp = execFileSync(process.execPath, [claudeCliPath, '--help'], { encoding: 'utf8' })
+        console.log(claudeHelp)
+      } catch (e) {
+        console.log(chalk.yellow('Could not retrieve claude help. Make sure claude is installed.'))
+      }
+
+      process.exit(0)
+    }
+
+    // Show vibe help
     if (showHelp) {
       console.log(`
 ${chalk.bold('vibe')} - Claude Code On the Go
@@ -346,10 +385,11 @@ ${chalk.bold('vibe')} - Claude Code On the Go
 ${chalk.bold('Usage:')}
   vibe [options]         Start Claude with mobile control
   vibe auth              Manage authentication
-  vibe codex             Start Codex mode
+  vibe codex             Start Codex mode (experimental)
   vibe gemini            Start Gemini CLI mode
   vibe cursor            Start Cursor CLI mode
   vibe connect           Connect AI vendor API keys
+  vibe router            Manage Claude Code Router (route to different models)
   vibe notify            Send push notification
   vibe daemon            Manage background service that allows
                             to spawn new sessions away from your computer
@@ -357,7 +397,7 @@ ${chalk.bold('Usage:')}
 
 ${chalk.bold('Examples:')}
   vibe claude              Start session
-  vibe claude --yolo       Start with bypassing permissions 
+  vibe claude --yolo       Start with bypassing permissions
                             (sugar for --dangerously-skip-permissions)
   vibe auth login --force  Authenticate
   vibe doctor              Run diagnostics
@@ -367,19 +407,13 @@ ${chalk.bold('Vibe supports ALL Claude options!')}
 
   vibe --resume
 
+${chalk.bold('Help:')}
+  vibe --help              Show this help
+  vibe --claude-help       Show Claude Code help and options
+
 ${chalk.gray('─'.repeat(60))}
-${chalk.bold.cyan('Claude Code Options (from `claude --help`):')}
 `)
-      
-      // Run claude --help and display its output
-      // Use execFileSync with the current Node executable for cross-platform compatibility
-      try {
-        const claudeHelp = execFileSync(process.execPath, [claudeCliPath, '--help'], { encoding: 'utf8' })
-        console.log(claudeHelp)
-      } catch (e) {
-        console.log(chalk.yellow('Could not retrieve claude help. Make sure claude is installed.'))
-      }
-      
+
       process.exit(0)
     }
 

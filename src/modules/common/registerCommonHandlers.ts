@@ -109,6 +109,15 @@ interface DifftasticResponse {
     error?: string;
 }
 
+interface SetCcrModeRequest {
+    mode: 'default' | 'enabled' | 'disabled';
+}
+
+interface SetCcrModeResponse {
+    success: boolean;
+    error?: string;
+}
+
 /*
  * Spawn Session Options and Result
  * This rpc type is used by the daemon, all other RPCs here are for sessions
@@ -429,6 +438,41 @@ export function registerCommonHandlers(rpcHandlerManager: RpcHandlerManager) {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to run difftastic'
             };
+        }
+    });
+
+    // Set CCR mode handler - updates Claude Code Router mode for the session
+    rpcHandlerManager.registerHandler<SetCcrModeRequest, SetCcrModeResponse>('setCcrMode', async (data) => {
+        logger.debug('Set CCR mode request:', data.mode);
+
+        try {
+            const { updateSettings } = await import('../../persistence');
+
+            // Update the global router setting based on the mode
+            if (data.mode === 'enabled') {
+                await updateSettings((settings) => ({
+                    ...settings,
+                    router: {
+                        enabled: true,
+                        configPath: settings.router?.configPath
+                    }
+                }));
+            } else if (data.mode === 'disabled') {
+                await updateSettings((settings) => ({
+                    ...settings,
+                    router: {
+                        enabled: false
+                    }
+                }));
+            } else if (data.mode === 'default') {
+                // For default, we keep the current setting but this allows the session to use the default behavior
+                // The actual logic is handled in claudeLocal.ts where it checks settings.router?.enabled
+            }
+
+            return { success: true };
+        } catch (error) {
+            logger.debug('Failed to set CCR mode:', error);
+            return { success: false, error: error instanceof Error ? error.message : 'Failed to set CCR mode' };
         }
     });
 }
