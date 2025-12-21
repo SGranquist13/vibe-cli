@@ -25,32 +25,54 @@ import { resolve } from 'node:path';
 import chalk from 'chalk';
 
 /**
+ * Extract router display info from config
+ */
+function getRouterDisplayInfo(config: {
+    providers?: Array<{ name: string }>;
+    Providers?: Array<{ name: string }>;
+    router?: { default?: string };
+    Router?: { default?: string };
+} | null): { provider: string; model: string } {
+    if (!config) {
+        return { provider: 'unknown', model: 'unknown' };
+    }
+
+    const providers = config.providers || config.Providers || [];
+    const providerNames = providers.map(p => p.name).filter(Boolean);
+    const provider = providerNames.length > 0 ? providerNames.join(', ') : 'unknown';
+
+    const routerSettings = config.router || config.Router;
+    const model = routerSettings?.default || 'default';
+
+    return { provider, model };
+}
+
+/**
  * Display router status at startup
  */
 async function displayRouterStatus(settings: Awaited<ReturnType<typeof readSettings>>): Promise<void> {
     const routerEnabled = settings.router?.enabled ?? false;
-    
+
     if (routerEnabled) {
         // Router is enabled - check if it's properly configured and running
         try {
             const { detectRouter } = await import('@/claude/utils/routerDetection');
             const { checkRouterServiceStatus } = await import('@/claude/utils/routerService');
-            
+
             const routerDetection = await detectRouter(settings.router?.configPath, false);
-            
+
             if (routerDetection.isInstalled && !routerDetection.error) {
                 // Router is installed and configured - ensure service is running
                 const { ensureRouterServiceRunning } = await import('@/claude/utils/routerService');
                 // Give service a moment to start if it was just launched
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 const serviceResult = await ensureRouterServiceRunning();
-                
+
                 if (serviceResult.isRunning) {
-                    if (serviceResult.wasStarted) {
-                        console.log(chalk.green('✓ Claude Code Router: Enabled and running (service started)'));
-                    } else {
-                        console.log(chalk.green('✓ Claude Code Router: Enabled and running'));
-                    }
+                    const { provider, model } = getRouterDisplayInfo(routerDetection.config);
+                    const statusSuffix = serviceResult.wasStarted ? ' (service started)' : '';
+                    console.log(chalk.green(`✓ Claude Code Router: Enabled and running${statusSuffix}`));
+                    console.log(chalk.gray(`   Provider: ${provider} | Model: ${model}`));
                     logger.debug('[runClaude] Router is enabled, installed, configured, and service is running');
                 } else {
                     console.log(chalk.yellow('⚠️  Claude Code Router: Enabled but service is not running'));
@@ -290,6 +312,8 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
 
     // Print log file path
     const logPath = logger.logFilePath;
+    console.log(chalk.blue(`📝 Session: ${response.id}`));
+    console.log(chalk.gray(`   Logs: ${logPath}`));
     logger.infoDeveloper(`Session: ${response.id}`);
     logger.infoDeveloper(`Logs: ${logPath}`);
 

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { resolve, join } from "node:path";
 import { createInterface } from "node:readline";
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync, existsSync, readFileSync } from "node:fs";
 import { watch } from "node:fs";
 import { logger } from "@/ui/logger";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
@@ -37,22 +37,52 @@ export async function claudeLocal(opts: {
     const detectedIdsFileSystem = new Set<string>();
     watcher.on('change', (event, filename) => {
         if (typeof filename === 'string' && filename.toLowerCase().endsWith('.jsonl')) {
-            logger.debug('change', event, filename);
+            logger.debug(`[claudeLocal] File change detected: ${event} ${filename}`);
             const sessionId = filename.replace('.jsonl', '');
             if (detectedIdsFileSystem.has(sessionId)) {
+                logger.debug(`[claudeLocal] Session ${sessionId} already detected, skipping`);
                 return;
             }
             detectedIdsFileSystem.add(sessionId);
+            logger.debug(`[claudeLocal] New session file detected: ${sessionId}, resolvedSessionId: ${resolvedSessionId}, hasUUID: ${detectedIdsRandomUUID.has(sessionId)}`);
 
             // Try to match
             if (resolvedSessionId) {
+                logger.debug(`[claudeLocal] Already resolved session ${resolvedSessionId}, skipping ${sessionId}`);
                 return;
             }
 
             // Try to match with random UUID
             if (detectedIdsRandomUUID.has(sessionId)) {
+                logger.debug(`[claudeLocal] Matched session ${sessionId} with UUID, calling onSessionFound`);
                 resolvedSessionId = sessionId;
                 opts.onSessionFound(sessionId);
+            } else {
+                // Fallback: If we're using router mode or UUID hasn't arrived yet,
+                // try to read the session ID from the file itself after a short delay
+                logger.debug(`[claudeLocal] Session ${sessionId} detected but no matching UUID yet, will try fallback after delay`);
+                setTimeout(() => {
+                    if (!resolvedSessionId) {
+                        try {
+                            const sessionFile = join(projectDir, filename);
+                            if (existsSync(sessionFile)) {
+                                const content = readFileSync(sessionFile, 'utf-8');
+                                const lines = content.split('\n').filter(l => l.trim());
+                                if (lines.length > 0) {
+                                    const firstMessage = JSON.parse(lines[0]);
+                                    // Check if this is a valid session file with sessionId field
+                                    if (firstMessage.sessionId || firstMessage.type) {
+                                        logger.debug(`[claudeLocal] Fallback: Using session ${sessionId} from file (router mode or UUID delayed)`);
+                                        resolvedSessionId = sessionId;
+                                        opts.onSessionFound(sessionId);
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            logger.debug(`[claudeLocal] Fallback failed to read session file: ${error}`);
+                        }
+                    }
+                }, 2000); // Wait 2 seconds for UUID, then fallback
             }
         }
     });
@@ -235,11 +265,15 @@ export async function claudeLocal(opts: {
 
                         switch (message.type) {
                             case 'uuid':
+                                logger.debug(`[claudeLocal] Received UUID: ${message.value}`);
                                 detectedIdsRandomUUID.add(message.value);
 
                                 if (!resolvedSessionId && detectedIdsFileSystem.has(message.value)) {
+                                    logger.debug(`[claudeLocal] UUID ${message.value} matches file system, calling onSessionFound`);
                                     resolvedSessionId = message.value;
                                     opts.onSessionFound(message.value);
+                                } else if (!resolvedSessionId) {
+                                    logger.debug(`[claudeLocal] UUID ${message.value} received but file not detected yet, waiting...`);
                                 }
                                 break;
 

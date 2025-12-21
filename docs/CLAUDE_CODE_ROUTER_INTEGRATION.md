@@ -254,3 +254,6 @@ vibe                 # Start Claude with router
 - [Claude Code Integration](./CLAUDE_CODE_INTEGRATION.md)
 - [Vibe Quick Start](../../../../QUICK_START.md)
 
+
+
+

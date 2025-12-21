@@ -124,12 +124,20 @@ async function findCcrExecutablePath(): Promise<string | null> {
     const locator = process.platform === 'win32' ? 'where ccr' : 'which ccr'
     try {
         const { stdout } = await execAsync(locator)
-        const path = stdout
+        const paths = stdout
             .split(/\r?\n/)
             .map((line) => line.trim())
-            .find((line) => line.length > 0)
-        if (path) {
-            return path
+            .filter((line) => line.length > 0)
+        
+        if (paths.length > 0) {
+            // On Windows, prefer .cmd files over bare executables
+            if (process.platform === 'win32') {
+                const cmdPath = paths.find(p => p.toLowerCase().endsWith('.cmd'))
+                if (cmdPath) {
+                    return cmdPath
+                }
+            }
+            return paths[0]
         }
     } catch {
         // continue to additional checks
@@ -301,6 +309,27 @@ export function getCcrSpawnConfig(executablePath: string): { executable: string;
         return {
             executable: 'powershell',
             args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', executablePath, 'code']
+        }
+    }
+
+    // On Windows, .cmd files can be executed directly
+    if (process.platform === 'win32' && executablePath.toLowerCase().endsWith('.cmd')) {
+        return {
+            executable: executablePath,
+            args: ['code']
+        }
+    }
+
+    // If on Windows and the path doesn't have an extension, try to find .cmd version
+    if (process.platform === 'win32' && !executablePath.includes('.')) {
+        const { existsSync } = require('node:fs');
+        const { join, dirname, basename } = require('node:path');
+        const cmdPath = join(dirname(executablePath), `${basename(executablePath)}.cmd`);
+        if (existsSync(cmdPath)) {
+            return {
+                executable: cmdPath,
+                args: ['code']
+            }
         }
     }
 

@@ -10,7 +10,7 @@ import { getProjectPath } from "./utils/path";
 import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
-import { detectRouter, getCcrSpawnConfig } from "./utils/routerDetection";
+import { detectRouter } from "./utils/routerDetection";
 import { readSettings } from "@/persistence";
 import { checkRouterServiceStatus } from "./utils/routerService";
 import chalk from 'chalk';
@@ -140,10 +140,13 @@ export async function claudeRemote(opts: {
     }
 
     // Get initial message
+    logger.debug(`[claudeRemote] Waiting for initial message...`);
     const initial = await opts.nextMessage();
     if (!initial) { // No initial message - exit
+        logger.debug(`[claudeRemote] No initial message received, exiting`);
         return;
     }
+    logger.debug(`[claudeRemote] Initial message received: ${initial.message.substring(0, 100)}...`);
 
     // Handle special commands
     const specialCommand = parseSpecialCommand(initial.message);
@@ -189,19 +192,17 @@ export async function claudeRemote(opts: {
         }
     }
 
-    // Configure executable based on router availability
+    // Configure executable - always use regular Claude Code, router is used via environment variables
     let executable = 'node';
     let executableArgs: string[] = [];
     let pathToClaudeCodeExecutable: string | undefined = resolve(join(projectPath(), 'scripts', 'claude_remote_launcher.cjs'));
     let routerConfigPath: string | undefined = undefined;
 
-    if (useRouter && routerDetection && routerDetection.executablePath) {
-        const spawnConfig = getCcrSpawnConfig(routerDetection.executablePath);
-        executable = spawnConfig.executable;
-        executableArgs = spawnConfig.args;
-        pathToClaudeCodeExecutable = undefined; // Router doesn't use pathToClaudeCodeExecutable
+    // Router is used via environment variables (same as local mode), not by spawning ccr directly
+    if (useRouter && routerDetection && routerDetection.isInstalled && !routerDetection.error) {
         routerConfigPath = routerDetection.configPath ?? undefined;
-        logger.debug(`[claudeRemote] Using router executable: ${spawnConfig.executable} ${spawnConfig.args.join(' ')}`);
+        logger.debug(`[claudeRemote] Router enabled - will use environment variables (same as local mode)`);
+        // Don't change executable/args - use regular Claude Code with router env vars
     }
 
     const sdkOptions: Options = {
@@ -219,9 +220,22 @@ export async function claudeRemote(opts: {
         executable,
         executableArgs,
         pathToClaudeCodeExecutable,
-        useRouter,
+        useRouter: false, // Don't use router spawn mode - use env vars instead
         routerConfigPath,
         abort: opts.signal
+    }
+    
+    // Set router environment variables if router is enabled (same as local mode)
+    if (useRouter && routerDetection && routerDetection.isInstalled && !routerDetection.error) {
+        process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
+        process.env.ANTHROPIC_AUTH_TOKEN = 'test'; // Dummy token for router
+        process.env.API_TIMEOUT_MS = '600000';
+        process.env.NO_PROXY = '127.0.0.1';
+        process.env.DISABLE_TELEMETRY = 'true';
+        process.env.DISABLE_COST_WARNINGS = 'true';
+        // Unset bedrock if it exists
+        delete process.env.CLAUDE_CODE_USE_BEDROCK;
+        logger.debug('[claudeRemote] Set router environment variables (same as local mode)');
     }
 
     // Track thinking state
@@ -237,16 +251,20 @@ export async function claudeRemote(opts: {
     };
 
     // Push initial message
+    logger.debug(`[claudeRemote] Pushing initial message to SDK`);
     let messages = new PushableAsyncIterable<SDKUserMessage>();
-    messages.push({
+    const initialSdkMessage: SDKUserMessage = {
         type: 'user',
         message: {
             role: 'user',
             content: initial.message,
         },
-    });
+    };
+    messages.push(initialSdkMessage);
+    logger.debug(`[claudeRemote] Initial message pushed to SDK, starting query`);
 
     // Start the loop
+    logger.debug(`[claudeRemote] Creating query with initial message`);
     const response = query({
         prompt: messages,
         options: sdkOptions,
@@ -255,7 +273,9 @@ export async function claudeRemote(opts: {
     updateThinking(true);
     try {
         logger.debug(`[claudeRemote] Starting to iterate over response`);
+        logger.debug(`[claudeRemote] Response is AsyncIterable, beginning iteration`);
 
+        let sdkInitialized = false;
         for await (const message of response) {
             logger.debugLargeJson(`[claudeRemote] Message ${message.type}`, message);
 
@@ -266,6 +286,8 @@ export async function claudeRemote(opts: {
             if (message.type === 'system' && message.subtype === 'init') {
                 // Start thinking when session initializes
                 updateThinking(true);
+                sdkInitialized = true;
+                logger.debug(`[claudeRemote] SDK initialized, initial message should now be processed`);
 
                 const systemInit = message as SDKSystemMessage;
 
@@ -326,10 +348,19 @@ export async function claudeRemote(opts: {
             }
         }
     } catch (e) {
+        logger.debug(`[claudeRemote] Caught error during iteration:`, e);
+        logger.debug(`[claudeRemote] Error type: ${e?.constructor?.name}, message: ${e instanceof Error ? e.message : String(e)}`);
+        logger.debug(`[claudeRemote] Error stack: ${e instanceof Error ? e.stack : 'N/A'}`);
+        
         if (e instanceof AbortError) {
             logger.debug(`[claudeRemote] Aborted`);
             // Ignore
+        } else if (opts.signal?.aborted) {
+            // If signal was aborted, treat any error as an abort (e.g., process exited during abort)
+            logger.debug(`[claudeRemote] Aborted (signal was aborted, ignoring error: ${e instanceof Error ? e.message : String(e)})`);
+            // Ignore
         } else {
+            logger.debug(`[claudeRemote] Re-throwing error:`, e);
             throw e;
         }
     } finally {

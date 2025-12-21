@@ -13,7 +13,10 @@ export async function claudeLocalLauncher(session: Session): Promise<'switch' | 
         onMessage: (message) => { 
             // Block SDK summary messages - we generate our own
             if (message.type !== 'summary') {
+                logger.debug(`[LOCAL] Scanner found message type: ${message.type}, sending to mobile app`);
                 session.client.sendClaudeSessionMessage(message)
+            } else {
+                logger.debug(`[LOCAL] Scanner found summary message, skipping`);
             }
         }
     });
@@ -75,6 +78,7 @@ export async function claudeLocalLauncher(session: Session): Promise<'switch' | 
 
         // Handle session start
         const handleSessionStart = (sessionId: string) => {
+            logger.debug(`[LOCAL] Session found: ${sessionId}, notifying scanner`);
             session.onSessionFound(sessionId);
             scanner.onNewSession(sessionId);
         }
@@ -112,10 +116,14 @@ export async function claudeLocalLauncher(session: Session): Promise<'switch' | 
                 }
             } catch (e) {
                 logger.debug('[local]: launch error', e);
-                if (!exitReason) {
+                // Check if abort was intentional (exitReason set) or if signal was aborted
+                const wasAborted = exitReason || processAbortController.signal.aborted;
+                if (!wasAborted) {
                     session.client.sendSessionEvent({ type: 'message', message: 'Process exited unexpectedly' });
                     continue;
                 } else {
+                    // Intentional abort (mode switch or exit) - don't show error
+                    logger.debug('[local]: launch aborted intentionally, not showing error');
                     break;
                 }
             }
